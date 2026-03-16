@@ -1,0 +1,32 @@
+appId: com.cozyclock.app
+productName: Cozy Clock
+
+directories:
+  buildResources: assets
+  output: dist
+
+files:
+  - dist-electron/main/**/*
+  - dist/renderer/**/*
+  - node_modules/**/*
+  - package.json
+
+win:
+  target:
+    - nsis
+  certificateFile: null
+  certificatePassword: null
+  signingHashAlgorithms:
+    - sha256
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Cozy Clock
+
+publish:
+  provider: github
+  owner: itsjesski
+  repo: CozyClock

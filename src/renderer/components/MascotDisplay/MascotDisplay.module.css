@@ -1,0 +1,136 @@
+.container {
+  z-index: 4;
+  pointer-events: none;
+}
+
+.fixed {
+  position: fixed;
+}
+
+.embedded {
+  position: absolute;
+  z-index: 2;
+}
+
+.embedded.topLeft {
+  top: 0.2rem;
+  left: 0.2rem;
+}
+
+.embedded.topRight {
+  top: 0.2rem;
+  right: 0.2rem;
+}
+
+.embedded.bottomLeft {
+  bottom: 0.2rem;
+  left: 0.2rem;
+}
+
+.embedded.bottomRight {
+  bottom: 0.2rem;
+  right: 0.2rem;
+}
+
+.topLeft {
+  top: 1rem;
+  left: 1rem;
+}
+
+.topRight {
+  top: 1rem;
+  right: 1rem;
+}
+
+.bottomLeft {
+  bottom: 1rem;
+  left: 1rem;
+}
+
+.bottomRight {
+  bottom: 1rem;
+  right: 1rem;
+}
+
+.image {
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+}
+
+.scaleWrap {
+  transform-origin: top right;
+}
+
+.embedded.topLeft .scaleWrap,
+.embedded.bottomLeft .scaleWrap {
+  transform-origin: top left;
+}
+
+.embedded.bottomRight .scaleWrap,
+.embedded.bottomLeft .scaleWrap {
+  transform-origin: bottom right;
+}
+
+.embedded.bottomLeft .scaleWrap {
+  transform-origin: bottom left;
+}
+
+.shake {
+  animation: mascotShake 0.75s ease-in-out;
+}
+
+.wiggle {
+  animation: mascotWiggle 0.75s ease-in-out;
+}
+
+.bounce {
+  animation: mascotBounce 0.75s ease-in-out;
+}
+
+@keyframes mascotShake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-8px);
+  }
+  40% {
+    transform: translateX(8px);
+  }
+  60% {
+    transform: translateX(-5px);
+  }
+  80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes mascotWiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-7deg);
+  }
+  40% {
+    transform: rotate(7deg);
+  }
+  60% {
+    transform: rotate(-5deg);
+  }
+  80% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes mascotBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-16px);
+  }
+}

@@ -1,0 +1,31 @@
+GNU GENERAL PUBLIC LICENSE
+Version 2, June 1991
+
+Copyright (C) 1989, 1991 Free Software Foundation, Inc.  
+59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+[Full GPL-2.0 License Text - truncated for brevity]
+[See https://www.gnu.org/licenses/old-licenses/gpl-2.0.html for full license]
+
+PREAMBLE
+
+The licenses for most software are designed to take away your freedom to share
+and change it. By contrast, the GNU General Public License is intended to
+guarantee your freedom to share and change free software—to make sure the
+software is free for all its users.
+
+This license applies to most of the Free Software Foundation's software and to
+any other program whose authors commit to using it.
+
+---
+
+For Cozy Clock, this means:
+- You can use, modify, and distribute Cozy Clock freely
+- Derivatives must also be licensed under GPL-2.0-or-later
+- Source code must be available to recipients
+- This software is provided "as is" without warranty
+
+For full license text, see: https://www.gnu.org/licenses/gpl-2.0.html

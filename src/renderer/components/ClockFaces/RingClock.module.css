@@ -1,0 +1,55 @@
+.ringContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
+}
+
+.ringSvg {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.1));
+}
+
+.progressRing {
+  transition: stroke-dashoffset 280ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  stroke-linecap: round;
+}
+
+.timeDisplaySvg {
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-size: 1.4rem;
+  font-weight: 300;
+  fill: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.percentage {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  animation: fadeIn 220ms ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .timeDisplaySvg {
+    font-size: 1.1rem;
+  }
+
+  .percentage {
+    font-size: 0.7rem;
+  }
+}

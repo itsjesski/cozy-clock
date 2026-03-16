@@ -1,0 +1,202 @@
+.container {
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.section {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--text-primary);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.toggleField {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.toggleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.subsection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.optionRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.65rem;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.optionRow input[type='checkbox'] {
+  margin: 0;
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.optionTitle {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.optionDescription {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.infoPill {
+  margin: 0;
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-primary));
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.helpText {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.select {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.range {
+  width: 100%;
+}
+
+.fileInput {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.45rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.alertCueList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.alertCueRow {
+  display: grid;
+  grid-template-columns: 52px 14px 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.numberInput,
+.input {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.35rem 0.4rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.percentLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.smallButton {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.smallButton:hover {
+  background: var(--bg-interactive);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.secondaryButton:hover {
+  background: var(--bg-interactive);
+}
+
+.closeButton {
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.9rem;
+  background: var(--accent-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
+.closeButton:hover {
+  background: var(--accent-secondary);
+}

@@ -1,0 +1,92 @@
+.flipClockContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  perspective: 1400px;
+  width: 100%;
+}
+
+.flipDisplay {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.flipCard {
+  width: 2.65rem;
+  height: 3.35rem;
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.staticBottom,
+.flipBottom {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  backface-visibility: hidden;
+}
+
+.staticBottom,
+.flipBottom {
+  top: 0;
+  align-items: center;
+  padding-top: 0;
+}
+
+.digitText {
+  display: block;
+  transform: translateY(-0.08em) scaleY(1.08);
+  z-index: 1;
+}
+
+.flipBottom {
+  z-index: 2;
+  transform-origin: center;
+  transform: rotateX(90deg);
+  animation: flipBottom 260ms ease-out forwards;
+}
+
+.separator {
+  color: var(--text-secondary);
+  font-weight: 600;
+  width: 0.7rem;
+  text-align: center;
+}
+
+@keyframes flipBottom {
+  0% {
+    transform: rotateX(90deg);
+    filter: brightness(0.92);
+  }
+  100% {
+    transform: rotateX(0deg);
+    filter: brightness(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .flipDisplay {
+    font-size: 1.65rem;
+  }
+
+  .flipCard {
+    width: 2.15rem;
+    height: 2.8rem;
+  }
+}
