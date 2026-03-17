@@ -14,6 +14,12 @@ interface CreateTimerModalProps {
   onCreate: () => void
 }
 
+const parseNumberInput = (value: string): number | null => {
+  if (value.trim() === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
   isOpen,
   form,
@@ -64,7 +70,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Generic timer minutes"
                 min={1}
                 value={form.genericMinutes}
-                onChange={(event) => setFormField('genericMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('genericMinutes', parsed)
+                }}
               />
             </label>
           </>
@@ -79,7 +89,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Sit duration minutes"
                 min={1}
                 value={form.sitMinutes}
-                onChange={(event) => setFormField('sitMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('sitMinutes', parsed)
+                }}
               />
             </label>
             <label className={styles.modalField}>
@@ -89,7 +103,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Stand duration minutes"
                 min={1}
                 value={form.standMinutes}
-                onChange={(event) => setFormField('standMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('standMinutes', parsed)
+                }}
               />
             </label>
           </>
@@ -104,7 +122,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Pomodoro work minutes"
                 min={1}
                 value={form.workMinutes}
-                onChange={(event) => setFormField('workMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('workMinutes', parsed)
+                }}
               />
             </label>
             <label className={styles.modalField}>
@@ -114,7 +136,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Pomodoro short break minutes"
                 min={1}
                 value={form.shortBreakMinutes}
-                onChange={(event) => setFormField('shortBreakMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('shortBreakMinutes', parsed)
+                }}
               />
             </label>
             <label className={styles.modalField}>
@@ -124,7 +150,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Pomodoro long break minutes"
                 min={1}
                 value={form.longBreakMinutes}
-                onChange={(event) => setFormField('longBreakMinutes', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('longBreakMinutes', parsed)
+                }}
               />
             </label>
             <label className={styles.modalField}>
@@ -134,7 +164,11 @@ export const CreateTimerModal: React.FC<CreateTimerModalProps> = ({
                 aria-label="Pomodoro rounds before long break"
                 min={1}
                 value={form.pomodoroRounds}
-                onChange={(event) => setFormField('pomodoroRounds', Number(event.target.value))}
+                onChange={(event) => {
+                  const parsed = parseNumberInput(event.target.value)
+                  if (parsed === null) return
+                  setFormField('pomodoroRounds', parsed)
+                }}
               />
             </label>
           </>

@@ -191,6 +191,7 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
             max={MAX_SERVER_PORT}
             value={settings.serverPort ?? DEFAULT_SERVER_PORT}
             onChange={(event) => {
+              if (event.target.value.trim() === '') return
               const serverPort = parseServerPort(
                 event.target.value,
                 settings.serverPort ?? DEFAULT_SERVER_PORT,
