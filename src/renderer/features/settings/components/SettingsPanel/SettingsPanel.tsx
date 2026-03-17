@@ -5,8 +5,17 @@
 import React from 'react'
 import { generateId } from '@shared/utils'
 import { AVAILABLE_THEMES, THEME_LABELS } from '@shared/constants'
-import { useGlobalStore } from '../../store/globalStore'
-import type { AlertCue, MascotAnimationCue, MascotAnimationType } from '../../../types'
+import { fileToDataUrl } from '../../../../utils/fileToDataUrl'
+import { appendItem, removeById, updateById } from '../../utils/listOps'
+import {
+  DEFAULT_SERVER_PORT,
+  MIN_SERVER_PORT,
+  MAX_SERVER_PORT,
+  parseServerPort,
+} from '@shared/serverPort'
+import { useSettingsUpdater } from '../../hooks/useSettingsUpdater'
+import { useGlobalStore } from '../../../../store/globalStore'
+import type { AlertCue, MascotAnimationCue, MascotAnimationType } from '../../../../../types'
 import styles from './SettingsPanel.module.css'
 
 interface SettingsPanelProps {
@@ -15,68 +24,65 @@ interface SettingsPanelProps {
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
   const settings = useGlobalStore((state) => state.settings)
-  const setSettings = useGlobalStore((state) => state.setSettings)
+  const applySettingsUpdate = useSettingsUpdater()
 
   const mascotAnimationTypes: MascotAnimationType[] = ['shake', 'wiggle', 'bounce']
 
   const updateGlobalAlertCue = (cueId: string, updates: Partial<AlertCue>) => {
-    const next = (settings.defaultAlertCues || []).map((cue) =>
-      cue.id === cueId ? { ...cue, ...updates } : cue,
-    )
-    setSettings({ defaultAlertCues: next })
-    window.electronAPI?.updateSettings({ defaultAlertCues: next })
+    const next = updateById(settings.defaultAlertCues || [], cueId, updates)
+    applySettingsUpdate({ defaultAlertCues: next })
   }
 
   const addGlobalAlertCue = () => {
-    const next = [
-      ...(settings.defaultAlertCues || []),
-      { id: generateId(), thresholdPercent: 50, soundPath: '' },
-    ]
-    setSettings({ defaultAlertCues: next })
-    window.electronAPI?.updateSettings({ defaultAlertCues: next })
+    const next = appendItem(settings.defaultAlertCues || [], {
+      id: generateId(),
+      thresholdPercent: 50,
+      soundPath: '',
+    })
+    applySettingsUpdate({ defaultAlertCues: next })
   }
 
   const removeGlobalAlertCue = (cueId: string) => {
-    const next = (settings.defaultAlertCues || []).filter((cue) => cue.id !== cueId)
-    setSettings({ defaultAlertCues: next })
-    window.electronAPI?.updateSettings({ defaultAlertCues: next })
+    const next = removeById(settings.defaultAlertCues || [], cueId)
+    applySettingsUpdate({ defaultAlertCues: next })
+  }
+
+  const browseGlobalAlertCueSound = async (cueId: string) => {
+    try {
+      const result = await window.electronAPI?.pickSoundFile()
+      if (!result?.success || !result.filePath) return
+      updateGlobalAlertCue(cueId, { soundPath: result.filePath })
+    } catch (error) {
+      console.error('Error selecting global alert sound file:', error)
+    }
   }
 
   const updateGlobalMascotCue = (cueId: string, updates: Partial<MascotAnimationCue>) => {
-    const next = (settings.defaultMascotAnimationCues || []).map((cue) =>
-      cue.id === cueId ? { ...cue, ...updates } : cue,
-    )
-    setSettings({ defaultMascotAnimationCues: next })
-    window.electronAPI?.updateSettings({ defaultMascotAnimationCues: next })
+    const next = updateById(settings.defaultMascotAnimationCues || [], cueId, updates)
+    applySettingsUpdate({ defaultMascotAnimationCues: next })
   }
 
   const addGlobalMascotCue = () => {
-    const next = [
-      ...(settings.defaultMascotAnimationCues || []),
-      { id: generateId(), thresholdPercent: 50, animation: 'wiggle' as MascotAnimationType },
-    ]
-    setSettings({ defaultMascotAnimationCues: next })
-    window.electronAPI?.updateSettings({ defaultMascotAnimationCues: next })
+    const next = appendItem(settings.defaultMascotAnimationCues || [], {
+      id: generateId(),
+      thresholdPercent: 50,
+      animation: 'wiggle' as MascotAnimationType,
+    })
+    applySettingsUpdate({ defaultMascotAnimationCues: next })
   }
 
   const removeGlobalMascotCue = (cueId: string) => {
-    const next = (settings.defaultMascotAnimationCues || []).filter((cue) => cue.id !== cueId)
-    setSettings({ defaultMascotAnimationCues: next })
-    window.electronAPI?.updateSettings({ defaultMascotAnimationCues: next })
+    const next = removeById(settings.defaultMascotAnimationCues || [], cueId)
+    applySettingsUpdate({ defaultMascotAnimationCues: next })
   }
 
   const handleMascotUpload: React.ChangeEventHandler<HTMLInputElement> = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const mascotImagePath = typeof reader.result === 'string' ? reader.result : undefined
-      if (!mascotImagePath) return
-      setSettings({ mascotImagePath })
-      window.electronAPI?.updateSettings({ mascotImagePath })
-    }
-    reader.readAsDataURL(file)
+    fileToDataUrl(file)
+      .then((mascotImagePath) => applySettingsUpdate({ mascotImagePath }))
+      .catch((error) => console.error('Error reading mascot file:', error))
   }
 
   return (
@@ -92,8 +98,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.theme}
             onChange={(event) => {
               const theme = event.target.value
-              setSettings({ theme })
-              window.electronAPI?.updateSettings({ theme })
+              applySettingsUpdate({ theme })
             }}
           >
             {AVAILABLE_THEMES.map((theme) => (
@@ -113,41 +118,28 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             checked={settings.alwaysOnTop ?? false}
             onChange={(event) => {
               const alwaysOnTop = event.target.checked
-              setSettings({ alwaysOnTop })
-              window.electronAPI?.updateSettings({ alwaysOnTop })
+              applySettingsUpdate({ alwaysOnTop })
             }}
           />
           Always On Top
         </label>
 
-        <label className={styles.toggleField}>
-          <input
-            type="checkbox"
-            checked={settings.minimizeToTray ?? true}
-            onChange={(event) => {
-              const minimizeToTray = event.target.checked
-              setSettings({ minimizeToTray })
-              window.electronAPI?.updateSettings({ minimizeToTray })
-            }}
-          />
-          Minimize To Tray
-        </label>
+
 
         <label className={styles.field}>
           Server Port
           <input
             className={styles.numberInput}
             type="number"
-            min={1024}
-            max={65535}
-            value={settings.serverPort ?? 5173}
+            min={MIN_SERVER_PORT}
+            max={MAX_SERVER_PORT}
+            value={settings.serverPort ?? DEFAULT_SERVER_PORT}
             onChange={(event) => {
-              const parsedPort = Number(event.target.value)
-              const serverPort = Number.isInteger(parsedPort) && parsedPort >= 1024 && parsedPort <= 65535
-                ? parsedPort
-                : 5173
-              setSettings({ serverPort })
-              window.electronAPI?.updateSettings({ serverPort })
+              const serverPort = parseServerPort(
+                event.target.value,
+                settings.serverPort ?? DEFAULT_SERVER_PORT,
+              )
+              applySettingsUpdate({ serverPort })
             }}
           />
           <span className={styles.helpText}>HTTP port for the app. Applies on next restart. If in use, a prompt will appear.</span>
@@ -163,8 +155,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
               checked={settings.defaultContinueFromLastTime ?? false}
               onChange={(event) => {
                 const defaultContinueFromLastTime = event.target.checked
-                setSettings({ defaultContinueFromLastTime })
-                window.electronAPI?.updateSettings({ defaultContinueFromLastTime })
+                applySettingsUpdate({ defaultContinueFromLastTime })
               }}
             />
             <span className={styles.optionText}>
@@ -179,8 +170,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
               checked={settings.defaultContinueWhileAppClosed ?? false}
               onChange={(event) => {
                 const defaultContinueWhileAppClosed = event.target.checked
-                setSettings({ defaultContinueWhileAppClosed })
-                window.electronAPI?.updateSettings({ defaultContinueWhileAppClosed })
+                applySettingsUpdate({ defaultContinueWhileAppClosed })
               }}
             />
             <span className={styles.optionText}>
@@ -205,8 +195,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.defaultGenericMode ?? 'countdown'}
             onChange={(event) => {
               const defaultGenericMode = event.target.value as 'countdown' | 'countup'
-              setSettings({ defaultGenericMode })
-              window.electronAPI?.updateSettings({ defaultGenericMode })
+              applySettingsUpdate({ defaultGenericMode })
             }}
           >
             <option value="countdown">Countdown</option>
@@ -221,8 +210,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.defaultSitStandMode ?? 'countdown'}
             onChange={(event) => {
               const defaultSitStandMode = event.target.value as 'countdown' | 'countup'
-              setSettings({ defaultSitStandMode })
-              window.electronAPI?.updateSettings({ defaultSitStandMode })
+              applySettingsUpdate({ defaultSitStandMode })
             }}
           >
             <option value="countdown">Countdown</option>
@@ -237,8 +225,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.defaultPomodoroMode ?? 'countdown'}
             onChange={(event) => {
               const defaultPomodoroMode = event.target.value as 'countdown' | 'countup'
-              setSettings({ defaultPomodoroMode })
-              window.electronAPI?.updateSettings({ defaultPomodoroMode })
+              applySettingsUpdate({ defaultPomodoroMode })
             }}
           >
             <option value="countdown">Countdown</option>
@@ -259,8 +246,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.defaultAlertVolume ?? 80}
             onChange={(event) => {
               const defaultAlertVolume = Number(event.target.value)
-              setSettings({ defaultAlertVolume })
-              window.electronAPI?.updateSettings({ defaultAlertVolume })
+              applySettingsUpdate({ defaultAlertVolume })
             }}
           />
         </label>
@@ -269,20 +255,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           Global Alert Cues
           <div className={styles.alertCueList}>
             {(settings.defaultAlertCues || []).map((cue) => (
-              <div key={cue.id} className={styles.alertCueRow}>
-                <input
-                  className={styles.numberInput}
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={cue.thresholdPercent}
-                  onChange={(event) =>
-                    updateGlobalAlertCue(cue.id, {
-                      thresholdPercent: Number(event.target.value),
-                    })
-                  }
-                />
-                <span className={styles.percentLabel}>%</span>
+              <div key={cue.id} className={styles.alertCueCard}>
+                <div className={styles.alertCueThresholdRow}>
+                  <span className={styles.alertCueThresholdLabel}>Sound will play when timer is at</span>
+                  <input
+                    className={styles.numberInput}
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={cue.thresholdPercent}
+                    onChange={(event) =>
+                      updateGlobalAlertCue(cue.id, {
+                        thresholdPercent: Number(event.target.value),
+                      })
+                    }
+                  />
+                  <span className={styles.percentLabel}>%</span>
+                </div>
                 <input
                   className={styles.input}
                   type="text"
@@ -292,9 +281,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     updateGlobalAlertCue(cue.id, { soundPath: event.target.value })
                   }
                 />
-                <button className={styles.smallButton} onClick={() => removeGlobalAlertCue(cue.id)}>
-                  Remove
-                </button>
+                <div className={styles.alertCueActionsRow}>
+                  <button
+                    type="button"
+                    className={`${styles.smallButton} ${styles.cueBrowseButton}`}
+                    onClick={() => browseGlobalAlertCueSound(cue.id)}
+                  >
+                    Browse
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.smallButton}
+                    onClick={() => removeGlobalAlertCue(cue.id)}
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
             <button className={styles.smallButton} onClick={addGlobalAlertCue}>
@@ -306,10 +308,37 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Mascot Defaults</h3>
-        <label className={styles.field}>
+        <div className={styles.field}>
           Mascot Image
-          <input className={styles.fileInput} type="file" accept="image/*" onChange={handleMascotUpload} />
-        </label>
+          <div className={styles.mascotUploadContainer}>
+            {settings.mascotImagePath && (
+              <div className={styles.mascotPreviewWrapper}>
+                <img
+                  src={settings.mascotImagePath}
+                  alt="Current mascot"
+                  className={styles.mascotPreview}
+                />
+                <button
+                  className={styles.clearButton}
+                  onClick={() => applySettingsUpdate({ mascotImagePath: '' })}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+            <label className={styles.fileInputLabel}>
+              <input
+                className={styles.fileInput}
+                type="file"
+                accept="image/*"
+                onChange={handleMascotUpload}
+              />
+              <span className={styles.fileInputButton}>
+                {settings.mascotImagePath ? 'Change Mascot' : 'Choose File'}
+              </span>
+            </label>
+          </div>
+        </div>
 
         <label className={styles.field}>
           Mascot Size
@@ -321,8 +350,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={settings.mascotSize ?? 100}
             onChange={(event) => {
               const mascotSize = Number(event.target.value)
-              setSettings({ mascotSize })
-              window.electronAPI?.updateSettings({ mascotSize })
+              applySettingsUpdate({ mascotSize })
             }}
           />
         </label>
@@ -337,8 +365,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             value={Math.round((settings.mascotScale ?? 0.65) * 100)}
             onChange={(event) => {
               const mascotScale = Number(event.target.value) / 100
-              setSettings({ mascotScale })
-              window.electronAPI?.updateSettings({ mascotScale })
+              applySettingsUpdate({ mascotScale })
             }}
           />
         </label>
@@ -354,8 +381,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                 | 'top-right'
                 | 'bottom-left'
                 | 'bottom-right'
-              setSettings({ mascotPosition })
-              window.electronAPI?.updateSettings({ mascotPosition })
+              applySettingsUpdate({ mascotPosition })
             }}
           >
             <option value="top-left">Top Left</option>

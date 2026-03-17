@@ -2,34 +2,14 @@
  * System tray management
  */
 
-import { app, Tray, Menu, BrowserWindow, nativeImage } from 'electron'
-import path from 'path'
-import fs from 'fs'
-import DataStore from './store'
+import { app, Tray, Menu, nativeImage } from 'electron'
+import DataStore from '../store'
+import { resolveTrayIconPath } from './assetPaths'
+import { hidePrimaryWindowToTray, showPrimaryWindow, getPrimaryWindow } from './windowUtils'
+import { shouldMinimizeToTray } from './trayPolicy'
 
 let tray: Tray | null = null
 const store = new DataStore()
-
-function resolveTrayIconPath(): string | undefined {
-  const candidates = [
-    // Mascot pixel art (preferred for branding)
-    path.join(__dirname, '../assets/mascot.png'),
-    path.join(process.cwd(), 'src/renderer/assets/mascot.png'),
-    path.join(process.cwd(), 'assets/mascot.png'),
-    // Fallback to SVG if available
-    path.join(__dirname, '../assets/mascot-placeholder.svg'),
-    path.join(process.cwd(), 'src/renderer/assets/mascot-placeholder.svg'),
-    // Standard tray/app icons
-    path.join(__dirname, '../assets/icon-tray.png'),
-    path.join(__dirname, '../assets/icon.png'),
-    path.join(process.cwd(), 'src/renderer/assets/icon-tray.png'),
-    path.join(process.cwd(), 'src/renderer/assets/icon.png'),
-    path.join(process.cwd(), 'assets/icon-tray.png'),
-    path.join(process.cwd(), 'assets/icon.png'),
-  ]
-
-  return candidates.find((candidate) => fs.existsSync(candidate))
-}
 
 function createTrayIcon() {
   const iconPath = resolveTrayIconPath()
@@ -53,20 +33,11 @@ export function isTrayReady(): boolean {
 }
 
 export function showMainWindowFromTray(): void {
-  const windows = BrowserWindow.getAllWindows()
-  if (windows.length === 0) return
-
-  windows[0].setSkipTaskbar(false)
-  windows[0].show()
-  windows[0].focus()
+  showPrimaryWindow()
 }
 
 export function hideMainWindowToTray(): void {
-  const windows = BrowserWindow.getAllWindows()
-  if (windows.length === 0) return
-
-  windows[0].setSkipTaskbar(true)
-  windows[0].hide()
+  hidePrimaryWindowToTray()
 }
 
 export function initializeTray(): boolean {
@@ -91,7 +62,7 @@ export function initializeTray(): boolean {
     {
       label: 'Hide to Tray',
       click: () => {
-        if (store.getSettings().minimizeToTray !== false && isTrayReady()) {
+        if (shouldMinimizeToTray(store.getSettings()) && isTrayReady()) {
           hideMainWindowToTray()
         }
       },
@@ -108,9 +79,9 @@ export function initializeTray(): boolean {
   tray.setToolTip('Cozy Clock - Timer Dashboard')
 
   tray.on('click', () => {
-    const windows = BrowserWindow.getAllWindows()
-    if (windows.length > 0) {
-      if (windows[0].isVisible()) {
+    const window = getPrimaryWindow()
+    if (window) {
+      if (window.isVisible()) {
         hideMainWindowToTray()
       } else {
         showMainWindowFromTray()

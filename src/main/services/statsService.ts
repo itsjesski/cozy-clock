@@ -1,4 +1,4 @@
-import DataStore from './store'
+import DataStore from '../store'
 import type {
   GlobalStats,
   StatsHistory,
@@ -7,8 +7,8 @@ import type {
   StatsPeriod,
   TimerStatsHistoryEntry,
   TimerPeriodStats,
-} from '../types'
-import { getTodayDate } from '../shared/utils'
+} from '../../types'
+import { getTodayDate } from '../../shared/utils'
 
 const store = new DataStore()
 
@@ -383,6 +383,155 @@ export function recordCompletedCycle(config: TimerConfig, completedPhaseLabel?: 
     stats: currentStats,
     statsHistory,
     lifetimeStats,
+  }
+}
+
+export function recordElapsedTime(
+  config: TimerConfig,
+  elapsedSeconds: number,
+  phaseLabel?: string,
+): {
+  stats: GlobalStats
+  statsHistory: StatsHistory[]
+  lifetimeStats: GlobalStats
+} {
+  ensureAutoResetStats()
+
+  const seconds = Math.max(0, elapsedSeconds)
+  if (seconds <= 0) {
+    return getStatsOverview()
+  }
+
+  let increment: Partial<Record<StatsBucketKey, number>> = {}
+
+  if (config.type === 'sit-stand') {
+    const isStanding = phaseLabel === 'Standing'
+    if (isStanding && config.includeStandInStats === false) {
+      return getStatsOverview()
+    }
+    if (!isStanding && config.includeSitInStats === false) {
+      return getStatsOverview()
+    }
+
+    increment = isStanding
+      ? { standTime: seconds }
+      : { sitTime: seconds }
+  } else if (config.type === 'pomodoro') {
+    const isBreakPhase = phaseLabel === 'Short Break' || phaseLabel === 'Long Break'
+    if (isBreakPhase) {
+      if (config.includePomodoroBreakInStats !== true) {
+        return getStatsOverview()
+      }
+      increment = { pomodoroBreakTime: seconds }
+    } else {
+      if (config.includePomodoroWorkInStats === false) {
+        return getStatsOverview()
+      }
+      increment = { pomodoroWorkTime: seconds }
+    }
+  } else {
+    increment = { genericTimerTime: seconds }
+  }
+
+  const updatedTimerHistory = updateTimerHistory(
+    store.getTimerStatsHistory(),
+    config.id,
+    getTodayDate(),
+    increment,
+  )
+  store.setTimerStatsHistory(updatedTimerHistory)
+
+  const currentStats = mergeStats(store.getStats(), increment)
+  const lifetimeStats = mergeStats(store.getLifetimeStats(), increment)
+  const statsHistory = updateHistory(store.getStatsHistory(), getTodayDate(), increment)
+
+  store.setStats(currentStats)
+  store.setLifetimeStats(lifetimeStats)
+  store.setStatsHistory(statsHistory)
+
+  return {
+    stats: currentStats,
+    statsHistory,
+    lifetimeStats,
+  }
+}
+
+export function removeTimerStats(timerId: string): {
+  stats: GlobalStats
+  statsHistory: StatsHistory[]
+  lifetimeStats: GlobalStats
+} {
+  const timerType = getTimerType(timerId)
+  const existingEntries = store.getTimerStatsHistory()
+  const removedEntries = existingEntries.filter((entry) => entry.timerId === timerId)
+
+  if (removedEntries.length === 0) {
+    return getStatsOverview()
+  }
+
+  const totalsToSubtract = removedEntries.reduce<TimerPeriodStats['day']>((acc, entry) => {
+    const normalized = normalizeTimerEntry(entry, timerType)
+    return {
+      totalTime: acc.totalTime + normalized.totalTime,
+      sitTime: acc.sitTime + normalized.sitTime,
+      standTime: acc.standTime + normalized.standTime,
+      pomodoroWorkTime: acc.pomodoroWorkTime + normalized.pomodoroWorkTime,
+      pomodoroBreakTime: acc.pomodoroBreakTime + normalized.pomodoroBreakTime,
+      genericTimerTime: acc.genericTimerTime + normalized.genericTimerTime,
+    }
+  }, createEmptyTimerBreakdown())
+
+  const subtractStats = (base: GlobalStats): GlobalStats => ({
+    ...base,
+    sitTime: Math.max(0, base.sitTime - totalsToSubtract.sitTime),
+    standTime: Math.max(0, base.standTime - totalsToSubtract.standTime),
+    pomodoroWorkTime: Math.max(0, base.pomodoroWorkTime - totalsToSubtract.pomodoroWorkTime),
+    pomodoroBreakTime: Math.max(0, base.pomodoroBreakTime - totalsToSubtract.pomodoroBreakTime),
+    genericTimerTime: Math.max(0, base.genericTimerTime - totalsToSubtract.genericTimerTime),
+  })
+
+  const nextStats = subtractStats(store.getStats())
+  const nextLifetime = subtractStats(store.getLifetimeStats())
+  const nextHistory = store.getStatsHistory().map((entry) => {
+    const perDateRemoved = removedEntries
+      .filter((timerEntry) => timerEntry.date === entry.date)
+      .reduce<TimerPeriodStats['day']>((acc, timerEntry) => {
+        const normalized = normalizeTimerEntry(timerEntry, timerType)
+        return {
+          totalTime: acc.totalTime + normalized.totalTime,
+          sitTime: acc.sitTime + normalized.sitTime,
+          standTime: acc.standTime + normalized.standTime,
+          pomodoroWorkTime: acc.pomodoroWorkTime + normalized.pomodoroWorkTime,
+          pomodoroBreakTime: acc.pomodoroBreakTime + normalized.pomodoroBreakTime,
+          genericTimerTime: acc.genericTimerTime + normalized.genericTimerTime,
+        }
+      }, createEmptyTimerBreakdown())
+
+    return {
+      ...entry,
+      sitTime: Math.max(0, entry.sitTime - perDateRemoved.sitTime),
+      standTime: Math.max(0, entry.standTime - perDateRemoved.standTime),
+      pomodoroWorkTime: Math.max(0, entry.pomodoroWorkTime - perDateRemoved.pomodoroWorkTime),
+      pomodoroBreakTime: Math.max(0, entry.pomodoroBreakTime - perDateRemoved.pomodoroBreakTime),
+      genericTimerTime: Math.max(0, entry.genericTimerTime - perDateRemoved.genericTimerTime),
+    }
+  }).filter((entry) =>
+    entry.sitTime > 0 ||
+    entry.standTime > 0 ||
+    entry.pomodoroWorkTime > 0 ||
+    entry.pomodoroBreakTime > 0 ||
+    entry.genericTimerTime > 0,
+  )
+
+  store.setTimerStatsHistory(existingEntries.filter((entry) => entry.timerId !== timerId))
+  store.setStats(nextStats)
+  store.setLifetimeStats(nextLifetime)
+  store.setStatsHistory(nextHistory)
+
+  return {
+    stats: nextStats,
+    statsHistory: nextHistory,
+    lifetimeStats: nextLifetime,
   }
 }
 

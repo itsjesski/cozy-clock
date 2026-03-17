@@ -4,10 +4,14 @@
 
 @import './themes/light.css';
 @import './themes/dark.css';
-@import './themes/sakura.css';
-@import './themes/forest.css';
-@import './themes/neon.css';
-@import './themes/paper.css';
+@import './themes/sakura-light.css';
+@import './themes/sakura-dark.css';
+@import './themes/forest-light.css';
+@import './themes/forest-dark.css';
+@import './themes/neon-light.css';
+@import './themes/neon-dark.css';
+@import './themes/paper-light.css';
+@import './themes/paper-dark.css';
 
 * {
   margin: 0;

@@ -126,6 +126,7 @@
   padding: 0.45rem;
   background: var(--bg-primary);
   color: var(--text-primary);
+  display: none;
 }
 
 .alertCueList {
@@ -134,11 +135,54 @@
   gap: 0.45rem;
 }
 
+.alertCueCard {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: var(--bg-primary);
+}
+
+.alertCueThresholdRow {
+  display: grid;
+  grid-template-columns: auto 64px auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.alertCueThresholdLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.alertCueActionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
 .alertCueRow {
   display: grid;
   grid-template-columns: 52px 14px 1fr auto;
   gap: 0.35rem;
   align-items: center;
+}
+
+.alertCueRowWithBrowse {
+  grid-template-columns: 52px 14px minmax(0, 1fr) auto auto;
+}
+
+.alertCueRowWithBrowse .input,
+.alertCueRowWithBrowse .select {
+  width: 100%;
+  min-width: 0;
+}
+
+.cueBrowseButton,
+.alertCueRowWithBrowse .smallButton {
+  white-space: nowrap;
 }
 
 .numberInput,
@@ -162,6 +206,10 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   cursor: pointer;
+}
+
+.alertCueActionsRow .smallButton {
+  min-width: 78px;
 }
 
 .smallButton:hover {
@@ -199,4 +247,78 @@
 
 .closeButton:hover {
   background: var(--accent-secondary);
+}
+
+@media (max-width: 600px) {
+  .alertCueThresholdRow {
+    grid-template-columns: 1fr 64px;
+  }
+
+  .alertCueThresholdLabel,
+  .percentLabel {
+    grid-column: 1 / -1;
+  }
+}
+
+.mascotUploadContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mascotPreviewWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.mascotPreview {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.fileInputLabel {
+  display: block;
+  cursor: pointer;
+}
+
+.fileInputButton {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.fileInputLabel:hover .fileInputButton {
+  background: color-mix(in srgb, var(--accent-primary) 90%, black);
+}
+
+.clearButton {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 80%, red);
+  border-color: red;
+  color: red;
 }

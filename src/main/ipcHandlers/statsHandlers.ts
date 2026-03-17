@@ -12,7 +12,7 @@ import {
   getStatsOverview,
   getTimerPeriodStats,
   resetStats,
-} from '../statsService'
+} from '../services/statsService'
 import { getTodayDate } from '../../shared/utils'
 
 export function registerStatsHandlers(): void {

@@ -276,6 +276,30 @@
   min-height: 225px;
 }
 
+.compactTile .flipContent {
+  transform: none;
+}
+
+.compactTile .faceFront,
+.compactTile .faceBack {
+  position: static;
+  inset: auto;
+  backface-visibility: visible;
+  transform: none;
+}
+
+.compactTile .faceBack {
+  display: none;
+}
+
+.compactTile .flipContentFlipped .faceFront {
+  display: none;
+}
+
+.compactTile .flipContentFlipped .faceBack {
+  display: flex;
+}
+
 .clockContainer {
   display: flex;
   align-items: center;
@@ -292,14 +316,6 @@
 }
 
 @keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .controls {
@@ -545,11 +561,49 @@
   gap: 0.5rem;
 }
 
+.alertCueCard {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  background: var(--bg-primary);
+}
+
+.alertCueThresholdRow {
+  display: grid;
+  grid-template-columns: auto 64px auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.alertCueThresholdLabel {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.alertCueActionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
 .alertCueRow {
   display: grid;
-  grid-template-columns: 52px 14px 1fr auto;
+  grid-template-columns: 52px 14px minmax(0, 1fr) auto auto;
   gap: 0.35rem;
   align-items: center;
+}
+
+.alertCueRow .settingsInput,
+.alertCueRow .settingsSelect {
+  width: 100%;
+  min-width: 0;
+}
+
+.removeCueButton {
+  white-space: nowrap;
 }
 
 .settingsNumberInput,
@@ -571,6 +625,7 @@
   padding: 0.35rem;
   background: var(--bg-primary);
   color: var(--text-primary);
+  display: none;
 }
 
 .percentLabel {
@@ -578,6 +633,7 @@
   font-size: 0.8rem;
 }
 
+.browseCueButton,
 .removeCueButton,
 .addCueButton {
   border: 1px solid var(--border-color);
@@ -589,6 +645,12 @@
   cursor: pointer;
 }
 
+.browseCueButton,
+.removeCueButton {
+  min-width: 78px;
+}
+
+.browseCueButton:hover,
 .removeCueButton:hover,
 .addCueButton:hover {
   background: var(--bg-interactive);
@@ -628,30 +690,6 @@
   background: var(--accent-secondary);
 }
 
-.badge {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: var(--warning);
-  color: white;
-  padding: 0.35rem 0.75rem;
-  border-radius: 4px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  animation: pulse 2s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
 /* Phase-based styling */
 .idle {
   opacity: 0.7;
@@ -689,4 +727,93 @@
   .labelInput {
     font-size: 1rem;
   }
+
+  .alertCueRow {
+    grid-template-columns: 52px 14px minmax(0, 1fr);
+  }
+
+  .alertCueThresholdRow {
+    grid-template-columns: 1fr 64px;
+  }
+
+  .alertCueThresholdLabel {
+    grid-column: 1 / -1;
+  }
+
+  .percentLabel {
+    grid-column: 1 / -1;
+  }
+
+  .alertCueRow .browseCueButton {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .alertCueRow .removeCueButton {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+}
+
+.mascotUploadContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mascotPreviewWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+}
+
+.mascotPreview {
+  max-width: 100%;
+  max-height: 120px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.fileInputLabel {
+  display: block;
+  cursor: pointer;
+}
+
+.fileInputButton {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--accent-primary);
+  border-radius: 6px;
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.fileInputLabel:hover .fileInputButton {
+  background: color-mix(in srgb, var(--accent-primary) 90%, black);
+}
+
+.clearButton {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background: color-mix(in srgb, var(--bg-secondary) 80%, red);
+  border-color: red;
+  color: red;
 }

@@ -26,6 +26,7 @@ const api = {
   pauseTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_PAUSE, { id }),
   resumeTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_RESUME, { id }),
   resetTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_RESET, { id }),
+  getTimerState: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_GET_STATE, { id }),
 
   // Settings
   getSettings: () => ipcRenderer.invoke(ipc.IPC_SETTINGS_GET),
@@ -49,6 +50,9 @@ const api = {
   quitApp: () => ipcRenderer.invoke(ipc.IPC_APP_QUIT),
   openUpdatesPage: () => ipcRenderer.invoke(ipc.IPC_APP_OPEN_UPDATES),
   openLogs: () => ipcRenderer.invoke(ipc.IPC_APP_OPEN_LOGS),
+  pickSoundFile: () => ipcRenderer.invoke(ipc.IPC_APP_PICK_SOUND_FILE),
+  resolveSoundSource: (soundPath: string) =>
+    ipcRenderer.invoke(ipc.IPC_APP_RESOLVE_SOUND_SOURCE, { soundPath }),
   startUpdateDownload: () => ipcRenderer.invoke(ipc.IPC_APP_UPDATE_DOWNLOAD),
   installDownloadedUpdate: () => ipcRenderer.invoke(ipc.IPC_APP_UPDATE_INSTALL),
   minimizeWindow: () => ipcRenderer.invoke(ipc.IPC_WINDOW_MINIMIZE),
@@ -56,8 +60,8 @@ const api = {
   closeWindow: () => ipcRenderer.invoke(ipc.IPC_WINDOW_CLOSE),
 
   // Port conflict modal
-  updateServerPort: (port: number) => ipcRenderer.send('update-server-port', port),
-  cancelPortChange: () => ipcRenderer.send('cancel-port-change'),
+  updateServerPort: (port: number) => ipcRenderer.send(ipc.IPC_PORT_UPDATE, port),
+  cancelPortChange: () => ipcRenderer.send(ipc.IPC_PORT_CANCEL),
 
   // Event listeners
   onTimerTick: (callback: (data: any) => void) => {
@@ -105,6 +109,11 @@ const api = {
     ipcRenderer.on(ipc.IPC_STATS_UPDATE, listener)
     return () => ipcRenderer.removeListener(ipc.IPC_STATS_UPDATE, listener)
   },
+  onSettingsUpdate: (callback: (data: any) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, data: any) => callback(data)
+    ipcRenderer.on(ipc.IPC_SETTINGS_UPDATE, listener)
+    return () => ipcRenderer.removeListener(ipc.IPC_SETTINGS_UPDATE, listener)
+  },
 
   // Remove listeners
   removeAllListeners: () => {
@@ -117,6 +126,7 @@ const api = {
     ipcRenderer.removeAllListeners(ipc.IPC_APP_UPDATE_ERROR)
     ipcRenderer.removeAllListeners(ipc.IPC_TIMER_STATE_UPDATE)
     ipcRenderer.removeAllListeners(ipc.IPC_STATS_UPDATE)
+    ipcRenderer.removeAllListeners(ipc.IPC_SETTINGS_UPDATE)
   },
 }
 

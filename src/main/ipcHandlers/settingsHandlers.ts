@@ -6,7 +6,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import DataStore from '../store'
 import * as ipc from '../../shared/ipc'
 import type { AppSettings } from '../../types'
-import { logError } from '../logger'
+import { logError } from '../services/logger'
 
 const store = new DataStore()
 

@@ -4,15 +4,30 @@
 
 import React, { useEffect, useState } from 'react'
 import { generateId } from '@shared/utils'
+import {
+  DEFAULT_GENERIC_DURATION,
+  DEFAULT_SIT_DURATION,
+  DEFAULT_STAND_DURATION,
+  DEFAULT_POMODORO_WORK,
+  DEFAULT_POMODORO_SHORT_BREAK,
+  DEFAULT_POMODORO_LONG_BREAK,
+  DEFAULT_POMODORO_ROUNDS_BEFORE_LONG,
+} from '@shared/constants'
+import { buildTimerConfig } from '../../utils/timerConfigFactory'
+import { getNextCircularIndex, getPreviousCircularIndex } from '../../utils/carousel'
+import { resolveDefaultModeByTimerType } from '../../utils/timerMode'
+import { useIpcSubscription } from '../../../../hooks/useIpcSubscription'
+import { useSettingsUpdater } from '../../../settings/hooks/useSettingsUpdater'
 import { TimerTile } from '../TimerTile/TimerTile'
-import { SettingsPanel } from '../SettingsPanel/SettingsPanel'
-import { useGlobalStore } from '../../store/globalStore'
-import type { TimerConfig } from '../../../types'
-import type { TimerType, TimerMode } from '../../../types'
+import { SettingsPanel } from '../../../settings/components/SettingsPanel/SettingsPanel'
+import { useGlobalStore } from '../../../../store/globalStore'
+import type { TimerConfig } from '../../../../../types'
+import type { TimerType, TimerMode } from '../../../../../types'
 import styles from './Dashboard.module.css'
 
 export const Dashboard: React.FC = () => {
   const globalSettings = useGlobalStore((state) => state.settings)
+  const applySettingsUpdate = useSettingsUpdater()
   const [timers, setTimers] = useState<TimerConfig[]>([])
   const [compactTimerIndex, setCompactTimerIndex] = useState(0)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -26,27 +41,31 @@ export const Dashboard: React.FC = () => {
   const [updateStatus, setUpdateStatus] = useState('Preparing download...')
   const [updateError, setUpdateError] = useState<string | null>(null)
 
+  const resetUpdateModalState = () => {
+    setUpdateError(null)
+    setIsUpdateReady(false)
+    setUpdateProgress(0)
+    setUpdateStatus('Preparing download...')
+    setIsDownloadingUpdate(true)
+  }
+
   const [newTimerType, setNewTimerType] = useState<TimerType>('generic')
   const [newTimerLabel, setNewTimerLabel] = useState('')
   const [newTimerMode, setNewTimerMode] = useState<TimerMode>('countdown')
-  const [newGenericMinutes, setNewGenericMinutes] = useState(25)
-  const [newSitMinutes, setNewSitMinutes] = useState(25)
-  const [newStandMinutes, setNewStandMinutes] = useState(5)
-  const [newWorkMinutes, setNewWorkMinutes] = useState(25)
-  const [newShortBreakMinutes, setNewShortBreakMinutes] = useState(5)
-  const [newLongBreakMinutes, setNewLongBreakMinutes] = useState(15)
-  const [newPomodoroRounds, setNewPomodoroRounds] = useState(4)
+  const [newGenericMinutes, setNewGenericMinutes] = useState(Math.round(DEFAULT_GENERIC_DURATION / 60))
+  const [newSitMinutes, setNewSitMinutes] = useState(Math.round(DEFAULT_SIT_DURATION / 60))
+  const [newStandMinutes, setNewStandMinutes] = useState(Math.round(DEFAULT_STAND_DURATION / 60))
+  const [newWorkMinutes, setNewWorkMinutes] = useState(Math.round(DEFAULT_POMODORO_WORK / 60))
+  const [newShortBreakMinutes, setNewShortBreakMinutes] = useState(
+    Math.round(DEFAULT_POMODORO_SHORT_BREAK / 60),
+  )
+  const [newLongBreakMinutes, setNewLongBreakMinutes] = useState(
+    Math.round(DEFAULT_POMODORO_LONG_BREAK / 60),
+  )
+  const [newPomodoroRounds, setNewPomodoroRounds] = useState(DEFAULT_POMODORO_ROUNDS_BEFORE_LONG)
 
   const getDefaultModeByType = (type: TimerType): TimerMode => {
-    if (type === 'sit-stand') {
-      return (globalSettings.defaultSitStandMode ?? 'countdown') as TimerMode
-    }
-
-    if (type === 'pomodoro') {
-      return (globalSettings.defaultPomodoroMode ?? 'countdown') as TimerMode
-    }
-
-    return (globalSettings.defaultGenericMode ?? 'countdown') as TimerMode
+    return resolveDefaultModeByTimerType(type, globalSettings)
   }
 
   useEffect(() => {
@@ -75,7 +94,7 @@ export const Dashboard: React.FC = () => {
     }
   }, [compactTimerIndex, timers.length])
 
-  useEffect(() => {
+  useIpcSubscription(() => {
     const unsubUpdateAvailable = window.electronAPI?.onUpdateAvailable(() => {
       setIsUpdateAvailable(true)
     })
@@ -109,11 +128,7 @@ export const Dashboard: React.FC = () => {
 
   const handleOpenUpdateModal = async () => {
     setIsUpdateModalOpen(true)
-    setUpdateError(null)
-    setIsUpdateReady(false)
-    setUpdateProgress(0)
-    setUpdateStatus('Preparing download...')
-    setIsDownloadingUpdate(true)
+    resetUpdateModalState()
 
     const result = await window.electronAPI?.startUpdateDownload()
     if (!result?.success) {
@@ -150,44 +165,21 @@ export const Dashboard: React.FC = () => {
   const handleCreateTimer = async () => {
     const nextIndex = timers.length + 1
     const timerId = generateId()
-
-    const fallbackLabelByType: Record<TimerType, string> = {
-      generic: `Timer ${nextIndex}`,
-      'sit-stand': `Sit Stand ${nextIndex}`,
-      pomodoro: `Pomodoro ${nextIndex}`,
-    }
-
-    const baseConfig: TimerConfig = {
-      id: timerId,
-      type: newTimerType,
-      label: newTimerLabel.trim() || fallbackLabelByType[newTimerType],
-      displayMode: 'digital',
-      mode: newTimerType === 'generic' ? newTimerMode : getDefaultModeByType(newTimerType),
-      useGlobalAlertCues: true,
-      useGlobalMascotSettings: true,
-      useGlobalMascotAnimationCues: true,
-    }
-
-    const typeSpecificConfig: Partial<TimerConfig> =
-      newTimerType === 'generic'
-        ? { duration: Math.max(1, Math.round(newGenericMinutes)) * 60 }
-        : newTimerType === 'sit-stand'
-          ? {
-              sitDuration: Math.max(1, Math.round(newSitMinutes)) * 60,
-              standDuration: Math.max(1, Math.round(newStandMinutes)) * 60,
-              autoLoop: true,
-            }
-          : {
-              workDuration: Math.max(1, Math.round(newWorkMinutes)) * 60,
-              shortBreakDuration: Math.max(1, Math.round(newShortBreakMinutes)) * 60,
-              longBreakDuration: Math.max(1, Math.round(newLongBreakMinutes)) * 60,
-              roundsBeforeLongBreak: Math.max(1, Math.round(newPomodoroRounds)),
-            }
-
-    const timerConfig: TimerConfig = {
-      ...baseConfig,
-      ...typeSpecificConfig,
-    }
+    const timerConfig = buildTimerConfig({
+      timerId,
+      timerType: newTimerType,
+      timerMode: newTimerMode,
+      defaultModeByType: getDefaultModeByType,
+      timerLabel: newTimerLabel,
+      timerIndex: nextIndex,
+      genericMinutes: newGenericMinutes,
+      sitMinutes: newSitMinutes,
+      standMinutes: newStandMinutes,
+      workMinutes: newWorkMinutes,
+      shortBreakMinutes: newShortBreakMinutes,
+      longBreakMinutes: newLongBreakMinutes,
+      pomodoroRounds: newPomodoroRounds,
+    })
 
     setTimers((prev) => [...prev, timerConfig])
     setIsCreateTimerOpen(false)
@@ -205,15 +197,13 @@ export const Dashboard: React.FC = () => {
 
   const goToPreviousCompactTimer = () => {
     setCompactTimerIndex((currentIndex) => {
-      if (timers.length === 0) return 0
-      return currentIndex === 0 ? timers.length - 1 : currentIndex - 1
+      return getPreviousCircularIndex(currentIndex, timers.length)
     })
   }
 
   const goToNextCompactTimer = () => {
     setCompactTimerIndex((currentIndex) => {
-      if (timers.length === 0) return 0
-      return currentIndex === timers.length - 1 ? 0 : currentIndex + 1
+      return getNextCircularIndex(currentIndex, timers.length)
     })
   }
 
@@ -257,8 +247,7 @@ export const Dashboard: React.FC = () => {
   const compactTimer = timers[compactTimerIndex]
 
   const setCompactMode = (compactMode: boolean) => {
-    useGlobalStore.getState().setSettings({ compactMode })
-    window.electronAPI?.updateSettings({ compactMode })
+    applySettingsUpdate({ compactMode })
   }
 
   return (

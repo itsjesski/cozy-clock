@@ -4,13 +4,10 @@
  */
 
 import { create, StoreApi } from 'zustand'
-import type { TimerState, TimerPhase } from '../../types'
+import type { TimerState } from '../../../../types'
 
 interface TimerStoreState {
   state: TimerState
-  setPhase: (phase: TimerPhase) => void
-  setTimeElapsed: (elapsed: number) => void
-  setTimeRemaining: (remaining: number) => void
   updateState: (updates: Partial<TimerState>) => void
 }
 
@@ -32,18 +29,6 @@ export function createTimerStore(timerId: string): TimerStore {
       timeRemaining: 0,
       lastUpdatedAt: Date.now(),
     },
-    setPhase: (phase) =>
-      set((state) => ({
-        state: { ...state.state, phase },
-      })),
-    setTimeElapsed: (elapsed) =>
-      set((state) => ({
-        state: { ...state.state, timeElapsed: elapsed },
-      })),
-    setTimeRemaining: (remaining) =>
-      set((state) => ({
-        state: { ...state.state, timeRemaining: remaining },
-      })),
     updateState: (updates) =>
       set((state) => ({
         state: { ...state.state, ...updates },

@@ -1,0 +1,21 @@
+/**
+ * Cozy Clock - Paper Dark theme
+ */
+
+[data-theme='PaperDark'] {
+  --bg-primary: #2a251d;
+  --bg-secondary: #1d1913;
+  --bg-interactive: #3a3228;
+  --text-primary: #f5f1e8;
+  --text-secondary: #c9b8a0;
+  --border-color: #5a4d3a;
+  --accent-primary: #b78a4a;
+  --accent-secondary: #d4a863;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+
+  --shadow-sm: 0 1px 2px rgba(183, 138, 74, 0.15);
+  --shadow-md: 0 4px 8px rgba(183, 138, 74, 0.2);
+  --shadow-lg: 0 12px 20px rgba(183, 138, 74, 0.25);
+}

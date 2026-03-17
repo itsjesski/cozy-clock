@@ -4,7 +4,7 @@
 
 import { create } from 'zustand'
 import type { AppSettings } from '../../types'
-import { DEFAULT_THEME } from '@shared/constants'
+import { createDefaultAppSettings } from '@shared/defaultSettings'
 
 interface GlobalState {
   settings: AppSettings
@@ -14,28 +14,7 @@ interface GlobalState {
 }
 
 export const useGlobalStore = create<GlobalState>((set) => ({
-  settings: {
-    theme: DEFAULT_THEME,
-    defaultAlertCues: [],
-    defaultAlertVolume: 80,
-    defaultMascotAnimationCues: [
-      { id: 'default-mascot-50', thresholdPercent: 50, animation: 'wiggle' },
-    ],
-    alwaysOnTop: false,
-    compactMode: false,
-    minimizeToTray: true,
-    defaultContinueFromLastTime: false,
-    defaultContinueWhileAppClosed: false,
-    mascotSize: 100,
-    mascotScale: 0.65,
-    mascotPosition: 'top-right',
-    enableInspirationMessages: true,
-    autoResetStatsSchedule: 'never',
-    defaultGenericMode: 'countdown',
-    defaultSitStandMode: 'countdown',
-    defaultPomodoroMode: 'countdown',
-    serverPort: 5173,
-  },
+  settings: createDefaultAppSettings(),
   isStreamerMode: false,
   setSettings: (updates) =>
     set((state) => ({

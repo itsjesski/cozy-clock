@@ -13,7 +13,7 @@ import {
   updateTimerConfig,
   getTimerState,
   getStoredTimerStatesForConfiguredTimers,
-} from '../timerEngine'
+} from '../services/timerEngine'
 import * as ipc from '../../shared/ipc'
 import type { TimerConfig } from '../../types'
 import DataStore from '../store'
@@ -100,6 +100,13 @@ export function registerTimerHandlers(): void {
   ipcMain.handle(ipc.IPC_TIMER_START, async (_event, { id }: { id: string }) => {
     try {
       startTimer(id)
+      const state = getTimerState(id)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      if (mainWindow && state) {
+        mainWindow.webContents.send(ipc.IPC_TIMER_STATE_UPDATE, {
+          states: { [id]: state },
+        })
+      }
       return { success: true }
     } catch (error) {
       console.error('Error starting timer:', error)
@@ -113,6 +120,13 @@ export function registerTimerHandlers(): void {
   ipcMain.handle(ipc.IPC_TIMER_PAUSE, async (_event, { id }: { id: string }) => {
     try {
       pauseTimer(id)
+      const state = getTimerState(id)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      if (mainWindow && state) {
+        mainWindow.webContents.send(ipc.IPC_TIMER_STATE_UPDATE, {
+          states: { [id]: state },
+        })
+      }
       return { success: true }
     } catch (error) {
       console.error('Error pausing timer:', error)
@@ -126,6 +140,13 @@ export function registerTimerHandlers(): void {
   ipcMain.handle(ipc.IPC_TIMER_RESUME, async (_event, { id }: { id: string }) => {
     try {
       resumeTimer(id)
+      const state = getTimerState(id)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      if (mainWindow && state) {
+        mainWindow.webContents.send(ipc.IPC_TIMER_STATE_UPDATE, {
+          states: { [id]: state },
+        })
+      }
       return { success: true }
     } catch (error) {
       console.error('Error resuming timer:', error)
@@ -149,6 +170,19 @@ export function registerTimerHandlers(): void {
       return { success: true }
     } catch (error) {
       console.error('Error resetting timer:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  /**
+   * Get a specific timer state
+   */
+  ipcMain.handle(ipc.IPC_TIMER_GET_STATE, async (_event, { id }: { id: string }) => {
+    try {
+      const state = getTimerState(id)
+      return { success: true, data: state }
+    } catch (error) {
+      console.error('Error getting timer state:', error)
       return { success: false, error: String(error) }
     }
   })

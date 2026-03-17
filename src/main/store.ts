@@ -12,7 +12,7 @@ import type {
   TimerStatsHistoryEntry,
   AppSettings,
 } from '../types'
-import { DEFAULT_THEME } from '../shared/constants'
+import { createDefaultAppSettings } from '../shared/defaultSettings'
 
 function createEmptyStats(): GlobalStats {
   return {
@@ -27,6 +27,32 @@ function createEmptyStats(): GlobalStats {
 
 class DataStore {
   private store: Store<StoredData>
+
+  private zeroSelectedStats(stats: GlobalStats, categories: string[]): GlobalStats {
+    const next = { ...stats }
+
+    if (categories.includes('all')) {
+      next.sitTime = 0
+      next.standTime = 0
+      next.pomodoroWorkTime = 0
+      next.pomodoroBreakTime = 0
+      next.genericTimerTime = 0
+      return next
+    }
+
+    if (categories.includes('sit')) next.sitTime = 0
+    if (categories.includes('stand')) next.standTime = 0
+    if (categories.includes('pomodoro-work')) next.pomodoroWorkTime = 0
+    if (categories.includes('pomodoro-break')) next.pomodoroBreakTime = 0
+    if (categories.includes('generic')) next.genericTimerTime = 0
+    return next
+  }
+
+  private resetStatsPayload(stats: GlobalStats, categories: string[]): GlobalStats {
+    const reset = this.zeroSelectedStats(stats, categories)
+    reset.lastResetAt = Date.now()
+    return reset
+  }
 
   constructor() {
     this.store = new Store<StoredData>({
@@ -53,28 +79,7 @@ class DataStore {
       this.store.set('lifetimeStats', createEmptyStats())
     }
     if (!this.store.has('settings')) {
-      this.store.set('settings', {
-        theme: DEFAULT_THEME,
-        defaultAlertCues: [],
-        defaultAlertVolume: 80,
-        defaultMascotAnimationCues: [
-          { id: 'default-mascot-50', thresholdPercent: 50, animation: 'wiggle' },
-        ],
-        alwaysOnTop: false,
-        compactMode: false,
-        minimizeToTray: true,
-        defaultContinueFromLastTime: false,
-        defaultContinueWhileAppClosed: false,
-        mascotSize: 100,
-        mascotScale: 0.65,
-        mascotPosition: 'top-right',
-        enableInspirationMessages: true,
-        autoResetStatsSchedule: 'never',
-        defaultGenericMode: 'countdown',
-        defaultSitStandMode: 'countdown',
-        defaultPomodoroMode: 'countdown',
-        serverPort: 5173,
-      })
+      this.store.set('settings', createDefaultAppSettings())
     }
   }
 
@@ -140,25 +145,7 @@ class DataStore {
   }
 
   resetStats(categories: string[] = ['all']): void {
-    const stats = this.getStats()
-    const resetStats = { ...stats }
-
-    if (categories.includes('all')) {
-      resetStats.sitTime = 0
-      resetStats.standTime = 0
-      resetStats.pomodoroWorkTime = 0
-      resetStats.pomodoroBreakTime = 0
-      resetStats.genericTimerTime = 0
-    } else {
-      if (categories.includes('sit')) resetStats.sitTime = 0
-      if (categories.includes('stand')) resetStats.standTime = 0
-      if (categories.includes('pomodoro-work')) resetStats.pomodoroWorkTime = 0
-      if (categories.includes('pomodoro-break')) resetStats.pomodoroBreakTime = 0
-      if (categories.includes('generic')) resetStats.genericTimerTime = 0
-    }
-
-    resetStats.lastResetAt = Date.now()
-    this.store.set('stats', resetStats)
+    this.store.set('stats', this.resetStatsPayload(this.getStats(), categories))
   }
 
   // Lifetime stats
@@ -176,25 +163,7 @@ class DataStore {
   }
 
   resetLifetimeStats(categories: string[] = ['all']): void {
-    const stats = this.getLifetimeStats()
-    const resetStats = { ...stats }
-
-    if (categories.includes('all')) {
-      resetStats.sitTime = 0
-      resetStats.standTime = 0
-      resetStats.pomodoroWorkTime = 0
-      resetStats.pomodoroBreakTime = 0
-      resetStats.genericTimerTime = 0
-    } else {
-      if (categories.includes('sit')) resetStats.sitTime = 0
-      if (categories.includes('stand')) resetStats.standTime = 0
-      if (categories.includes('pomodoro-work')) resetStats.pomodoroWorkTime = 0
-      if (categories.includes('pomodoro-break')) resetStats.pomodoroBreakTime = 0
-      if (categories.includes('generic')) resetStats.genericTimerTime = 0
-    }
-
-    resetStats.lastResetAt = Date.now()
-    this.store.set('lifetimeStats', resetStats)
+    this.store.set('lifetimeStats', this.resetStatsPayload(this.getLifetimeStats(), categories))
   }
 
   // Stats history
@@ -222,28 +191,7 @@ class DataStore {
 
   // Settings
   getSettings(): AppSettings {
-    return this.store.get('settings', {
-      theme: DEFAULT_THEME,
-      defaultAlertCues: [],
-      defaultAlertVolume: 80,
-      defaultMascotAnimationCues: [
-        { id: 'default-mascot-50', thresholdPercent: 50, animation: 'wiggle' },
-      ],
-      alwaysOnTop: false,
-      compactMode: false,
-      minimizeToTray: true,
-      defaultContinueFromLastTime: false,
-      defaultContinueWhileAppClosed: false,
-      mascotSize: 100,
-      mascotScale: 0.65,
-      mascotPosition: 'top-right',
-      enableInspirationMessages: true,
-      autoResetStatsSchedule: 'never',
-      defaultGenericMode: 'countdown',
-      defaultSitStandMode: 'countdown',
-      defaultPomodoroMode: 'countdown',
-      serverPort: 5173,
-    })
+    return this.store.get('settings', createDefaultAppSettings())
   }
 
   updateSettings(updates: Partial<AppSettings>): void {

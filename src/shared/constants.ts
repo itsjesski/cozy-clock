@@ -24,10 +24,14 @@ export const DEFAULT_ALERT_VOLUME = 80
 export const AVAILABLE_THEMES = [
   'CozyLight',
   'CozyDark',
-  'Sakura',
-  'Forest',
-  'Neon',
-  'Paper',
+  'SakuraLight',
+  'SakuraDark',
+  'ForestLight',
+  'ForestDark',
+  'NeonLight',
+  'NeonDark',
+  'PaperLight',
+  'PaperDark',
 ] as const
 
 export const DEFAULT_THEME = 'CozyLight'
@@ -35,25 +39,30 @@ export const DEFAULT_THEME = 'CozyLight'
 export const THEME_LABELS: Record<(typeof AVAILABLE_THEMES)[number], string> = {
   CozyLight: 'Cozy Light',
   CozyDark: 'Cozy Dark',
-  Sakura: 'Sakura',
-  Forest: 'Forest',
-  Neon: 'Neon',
-  Paper: 'Paper',
+  SakuraLight: 'Sakura Light',
+  SakuraDark: 'Sakura Dark',
+  ForestLight: 'Forest Light',
+  ForestDark: 'Forest Dark',
+  NeonLight: 'Neon Light',
+  NeonDark: 'Neon Dark',
+  PaperLight: 'Paper Light',
+  PaperDark: 'Paper Dark',
 }
 
+// Legacy theme name mapping for backwards compatibility
 export const LEGACY_THEME_MAP: Record<string, (typeof AVAILABLE_THEMES)[number]> = {
   'cozy-light': 'CozyLight',
   'cozy-dark': 'CozyDark',
   CozyLight: 'CozyLight',
   CozyDark: 'CozyDark',
-  sakura: 'Sakura',
-  forest: 'Forest',
-  neon: 'Neon',
-  paper: 'Paper',
-  Sakura: 'Sakura',
-  Forest: 'Forest',
-  Neon: 'Neon',
-  Paper: 'Paper',
+  sakura: 'SakuraLight',
+  forest: 'ForestLight',
+  neon: 'NeonLight',
+  paper: 'PaperLight',
+  Sakura: 'SakuraLight',
+  Forest: 'ForestLight',
+  Neon: 'NeonLight',
+  Paper: 'PaperLight',
 }
 
 // Clock display modes

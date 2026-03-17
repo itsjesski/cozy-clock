@@ -4,13 +4,13 @@
  */
 
 import { BrowserWindow } from 'electron'
-import DataStore from './store'
-import { createTimer } from './timers/factory'
-import { recordCompletedCycle } from './statsService'
-import * as ipc from '../shared/ipc'
-import type { TimerState, TimerConfig, AlertCue, MascotAnimationCue } from '../types'
-import type { AppSettings } from '../types'
-import type { BaseTimer } from './timers/BaseTimer'
+import DataStore from '../store'
+import { createTimer } from '../timers/factory'
+import { getStatsOverview, recordElapsedTime, removeTimerStats } from './statsService'
+import * as ipc from '../../shared/ipc'
+import type { TimerState, TimerConfig, AlertCue, MascotAnimationCue } from '../../types'
+import type { AppSettings } from '../../types'
+import type { BaseTimer } from '../timers/BaseTimer'
 
 const store = new DataStore()
 let tickInterval: NodeJS.Timeout | null = null
@@ -20,6 +20,7 @@ const firedMascotThresholds = new Map<string, Set<number>>()
 const lastRemainingPercent = new Map<string, number>()
 const lastPersistedStateAt = new Map<string, number>()
 const lastRendererEmitAt = new Map<string, number>()
+const lastRecordedElapsedSeconds = new Map<string, number>()
 let lastTickTime = Date.now()
 let settingsCache: AppSettings | null = null
 let settingsCacheAt = 0
@@ -206,6 +207,8 @@ function updateRunningTimers(): void {
     // Tick the timer
     timer.tick(deltaTime)
 
+    syncAccumulatedStats(timerId, timer)
+
     emitThresholdAlerts(timerId, timer, mainWindow)
 
     const lastPersisted = lastPersistedStateAt.get(timerId) ?? 0
@@ -237,6 +240,23 @@ function updateRunningTimers(): void {
 
 function getCurrentPhaseTotalSeconds(timer: BaseTimer): number {
   return getPhaseTotalSecondsFromConfig(timer.config, timer.getPhaseLabel())
+}
+
+function syncAccumulatedStats(timerId: string, timer: BaseTimer): void {
+  const currentWholeElapsed = Math.max(0, Math.floor(timer.state.timeElapsed || 0))
+  const lastRecorded = lastRecordedElapsedSeconds.get(timerId) ?? 0
+  const delta = currentWholeElapsed - lastRecorded
+
+  if (delta <= 0) {
+    return
+  }
+
+  const statsOverview = recordElapsedTime(timer.config, delta, timer.getPhaseLabel())
+  lastRecordedElapsedSeconds.set(timerId, lastRecorded + delta)
+
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
+  })
 }
 
 function getEffectiveAlertCues(config: TimerConfig): AlertCue[] {
@@ -320,12 +340,8 @@ function handleTimerComplete(
   timer: BaseTimer,
   mainWindow: BrowserWindow,
 ): void {
-  const completedPhaseLabel = timer.getPhaseLabel()
-  const completedConfig = timer.config
   const completion = timer.handleCompletion()
-  const statsOverview = recordCompletedCycle(completedConfig, completedPhaseLabel)
-
-  mainWindow.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
+  lastRecordedElapsedSeconds.set(timerId, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
 
   if (completion.isComplete) {
     // Timer is fully done
@@ -393,6 +409,12 @@ export function loadTimer(config: TimerConfig, savedState?: TimerState): BaseTim
   return timer
 }
 
+function loadTimerFromSavedState(config: TimerConfig, savedState: TimerState): BaseTimer {
+  const timer = createTimer(config)
+  hydrateTimerFromSavedState(timer, savedState)
+  return timer
+}
+
 /**
  * Start a timer
  */
@@ -404,11 +426,14 @@ export function startTimer(id: string): void {
     if (!config) return
 
     const savedState = store.getTimerState(id)
-    timer = loadTimer(config, savedState)
+    timer = savedState && savedState.phase !== 'idle'
+      ? loadTimerFromSavedState(config, savedState)
+      : loadTimer(config, savedState)
     activeTimers.set(id, timer)
   }
 
   timer.start()
+  lastRecordedElapsedSeconds.set(id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
   firedAlertThresholds.delete(id)
   firedMascotThresholds.delete(id)
   lastRemainingPercent.delete(id)
@@ -425,6 +450,7 @@ export function pauseTimer(id: string): void {
   const timer = activeTimers.get(id)
 
   if (timer) {
+    syncAccumulatedStats(id, timer)
     timer.pause()
     store.setTimerState(id, timer.getState())
     lastPersistedStateAt.set(id, Date.now())
@@ -447,11 +473,14 @@ export function resumeTimer(id: string): void {
     if (!config) return
 
     const savedState = store.getTimerState(id)
-    timer = loadTimer(config, savedState)
+    timer = savedState
+      ? loadTimerFromSavedState(config, savedState)
+      : loadTimer(config, savedState)
     activeTimers.set(id, timer)
   }
 
   timer.resume()
+  lastRecordedElapsedSeconds.set(id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
   lastPersistedStateAt.set(id, Date.now())
   lastRendererEmitAt.set(id, 0)
   store.setTimerState(id, timer.getState())
@@ -465,13 +494,21 @@ export function resetTimer(id: string): void {
   const timer = activeTimers.get(id)
 
   if (timer) {
+    syncAccumulatedStats(id, timer)
+
     timer.reset()
+    lastRecordedElapsedSeconds.set(id, 0)
     firedAlertThresholds.delete(id)
     firedMascotThresholds.delete(id)
     lastRemainingPercent.delete(id)
     lastPersistedStateAt.set(id, Date.now())
     lastRendererEmitAt.delete(id)
     store.setTimerState(id, timer.getState())
+
+    const statsOverview = getStatsOverview()
+    BrowserWindow.getAllWindows().forEach((window) => {
+      window.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
+    })
   }
 
   if (Array.from(activeTimers.values()).every((t) => t.state.phase !== 'running')) {
@@ -484,11 +521,16 @@ export function resetTimer(id: string): void {
  */
 export function deleteTimer(id: string): void {
   activeTimers.delete(id)
+  const statsOverview = removeTimerStats(id)
+  BrowserWindow.getAllWindows().forEach((window) => {
+    window.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
+  })
   firedAlertThresholds.delete(id)
   firedMascotThresholds.delete(id)
   lastRemainingPercent.delete(id)
   lastPersistedStateAt.delete(id)
   lastRendererEmitAt.delete(id)
+  lastRecordedElapsedSeconds.delete(id)
   store.deleteTimer(id)
   store.deleteTimerState(id)
 
@@ -558,6 +600,7 @@ export function initializeTimersFromStore(): void {
       }
 
       activeTimers.set(config.id, timer)
+      lastRecordedElapsedSeconds.set(config.id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
       lastPersistedStateAt.set(config.id, Date.now())
       lastRendererEmitAt.set(config.id, 0)
     }

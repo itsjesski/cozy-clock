@@ -3,7 +3,7 @@ const fs = require('fs')
 const path = require('path')
 const http = require('http')
 
-function resolveConfiguredDevPort() {
+function resolveConfiguredServerPort() {
   const envPort = Number(process.env.COZY_CLOCK_PORT)
   if (Number.isInteger(envPort) && envPort >= 1024 && envPort <= 65535) {
     return envPort
@@ -73,7 +73,7 @@ function waitForVite(port, timeoutMs = 120000) {
 }
 
 ;(async () => {
-  const port = resolveConfiguredDevPort()
+  const port = resolveConfiguredServerPort()
   const buildCode = await runCommand('npm', ['run', 'build:main'])
   if (buildCode !== 0) {
     process.exit(buildCode)

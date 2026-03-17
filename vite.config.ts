@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 
-function resolveConfiguredDevPort(): number {
+function resolveConfiguredServerPort(): number {
   const envPort = Number(process.env.COZY_CLOCK_PORT)
   if (Number.isInteger(envPort) && envPort >= 1024 && envPort <= 65535) {
     return envPort
@@ -37,7 +37,7 @@ function resolveConfiguredDevPort(): number {
   return 5173
 }
 
-const devPort = resolveConfiguredDevPort()
+const devPort = resolveConfiguredServerPort()
 
 export default defineConfig({
   plugins: [react()],

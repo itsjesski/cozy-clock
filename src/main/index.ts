@@ -4,20 +4,25 @@
 
 import { app, BrowserWindow, screen, ipcMain } from 'electron'
 import path from 'path'
-import fs from 'fs'
 import net from 'net'
 import isDev from 'electron-is-dev'
-import { initializeUpdater } from './updater'
-import { initializeTray, isTrayReady, hideMainWindowToTray } from './tray'
+import { initializeUpdater } from './services/updater'
 import { registerAllHandlers } from './ipcHandlers'
-import { startTimerEngine, initializeTimersFromStore } from './timerEngine'
+import { startTimerEngine, initializeTimersFromStore } from './services/timerEngine'
 import * as ipc from '../shared/ipc'
 import DataStore from './store'
-import { logError, logInfo } from './logger'
-import { applyLowRamSettings } from './lowRam'
+import { logInfo } from './services/logger'
+import { applyLowRamSettings } from './services/lowRam'
+import {
+  DEFAULT_SERVER_PORT,
+  isValidServerPort,
+} from '../shared/serverPort'
+import { resolveWindowIconPath } from './windows/assetPaths'
+import { buildPortConflictDialogHtml } from './windows/portDialogHtml'
+import { registerGlobalProcessErrorHandlers } from './services/errorHandlers'
+import { broadcastToAllWindows } from './windows/windowBroadcast'
 
 let mainWindow: BrowserWindow | null = null
-let isQuitting = false
 const store = new DataStore()
 
 if (isDev) {
@@ -26,28 +31,18 @@ if (isDev) {
 
 applyLowRamSettings()
 
-function resolveWindowIconPath(): string | undefined {
-  const candidates = [
-    path.join(__dirname, '../assets/icon.png'),
-    path.join(process.cwd(), 'src/renderer/assets/icon.png'),
-    path.join(process.cwd(), 'assets/icon.png'),
-  ]
-
-  return candidates.find((candidate) => fs.existsSync(candidate))
-}
-
 export function getServerPort(): number {
   const settingsPort = Number(store.getSettings().serverPort)
-  if (Number.isInteger(settingsPort) && settingsPort >= 1024 && settingsPort <= 65535) {
+  if (isValidServerPort(settingsPort)) {
     return settingsPort
   }
 
   const envPort = Number(process.env.COZY_CLOCK_PORT)
-  if (Number.isInteger(envPort) && envPort >= 1024 && envPort <= 65535) {
+  if (isValidServerPort(envPort)) {
     return envPort
   }
 
-  return 5173
+  return DEFAULT_SERVER_PORT
 }
 
 function isPortInUse(port: number): Promise<boolean> {
@@ -83,99 +78,13 @@ async function showPortConflictDialog(conflictPort: number): Promise<void> {
       },
     })
 
-    // Create minimal HTML for port conflict dialog
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background: ${isDev ? '#1e1e1e' : '#fff'};
-      color: ${isDev ? '#e0e0e0' : '#000'};
-    }
-    h1 { font-size: 18px; margin-top: 0; }
-    p { margin: 12px 0; font-size: 14px; }
-    .port-num { font-weight: bold; color: #007acc; }
-    .input-group {
-      margin: 20px 0;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-    input {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
-      width: 100px;
-      background: ${isDev ? '#2d2d2d' : '#fff'};
-      color: ${isDev ? '#e0e0e0' : '#000'};
-    }
-    .buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 24px;
-      justify-content: flex-end;
-    }
-    button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      font-size: 14px;
-      cursor: pointer;
-      background: #007acc;
-      color: white;
-    }
-    button:hover { background: #005a9e; }
-    button.secondary {
-      background: #666;
-    }
-    button.secondary:hover { background: #555; }
-  </style>
-</head>
-<body>
-  <h1>⚠️ Port Already in Use</h1>
-  <p>The server port <span class="port-num" id="portNum">${conflictPort}</span> is already in use by another application.</p>
-  <p>Enter a different port number to continue:</p>
-  <div class="input-group">
-    <input type="number" id="newPort" min="1024" max="65535" value="5174" />
-  </div>
-  <div class="buttons">
-    <button class="secondary" id="cancelBtn">Cancel</button>
-    <button id="restartBtn">Update & Restart</button>
-  </div>
-  <script>
-    const input = document.getElementById('newPort');
-    const restartBtn = document.getElementById('restartBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
-    
-    input.focus();
-    input.select();
-    
-    restartBtn.onclick = () => {
-      const port = Number(input.value);
-      if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
-        window.electronAPI?.updateServerPort(port);
-      }
-    };
-    
-    cancelBtn.onclick = () => {
-      window.electronAPI?.cancelPortChange();
-    };
-  </script>
-</body>
-</html>
-    `
+    const htmlContent = buildPortConflictDialogHtml(conflictPort, isDev)
 
     portModalWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`)
 
     // IPC handlers for port modal
     const handleUpdatePort = (_: Electron.IpcMainEvent, port: number) => {
-      if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
+      if (isValidServerPort(port)) {
         store.updateSettings({ serverPort: port })
         portModalWindow.close()
         app.relaunch()
@@ -186,15 +95,16 @@ async function showPortConflictDialog(conflictPort: number): Promise<void> {
 
     const handleCancelPort = () => {
       portModalWindow.close()
+      app.quit()
       resolve()
     }
 
-    ipcMain.once('update-server-port', handleUpdatePort)
-    ipcMain.once('cancel-port-change', handleCancelPort)
+    ipcMain.once(ipc.IPC_PORT_UPDATE, handleUpdatePort)
+    ipcMain.once(ipc.IPC_PORT_CANCEL, handleCancelPort)
 
     portModalWindow.on('closed', () => {
-      ipcMain.removeListener('update-server-port', handleUpdatePort)
-      ipcMain.removeListener('cancel-port-change', handleCancelPort)
+      ipcMain.removeListener(ipc.IPC_PORT_UPDATE, handleUpdatePort)
+      ipcMain.removeListener(ipc.IPC_PORT_CANCEL, handleCancelPort)
       resolve()
     })
   })
@@ -270,24 +180,6 @@ function createWindow() {
   mainWindow.on('resize', ensureWindowOnScreen)
   screen.on('display-metrics-changed', ensureWindowOnScreen)
 
-  const nativeMinimizeEmitter = mainWindow as unknown as {
-    on: (event: string, listener: (event: Electron.Event) => void) => void
-  }
-
-  nativeMinimizeEmitter.on('minimize', (event: Electron.Event) => {
-    if (!isQuitting && store.getSettings().minimizeToTray && (isTrayReady() || initializeTray())) {
-      event.preventDefault()
-      hideMainWindowToTray()
-    }
-  })
-
-  mainWindow.on('close', (event) => {
-    if (!isQuitting && store.getSettings().minimizeToTray && (isTrayReady() || initializeTray())) {
-      event.preventDefault()
-      hideMainWindowToTray()
-    }
-  })
-
   mainWindow.on('closed', () => {
     screen.removeListener('display-metrics-changed', ensureWindowOnScreen)
     mainWindow = null
@@ -297,55 +189,38 @@ function createWindow() {
 }
 
 app.on('ready', async () => {
-  process.on('uncaughtException', (error) => {
-    console.error('Uncaught exception:', error)
-    logError('Uncaught exception', error)
-  })
-
-  process.on('unhandledRejection', (error) => {
-    console.error('Unhandled rejection:', error)
-    logError('Unhandled rejection', error)
-  })
+  registerGlobalProcessErrorHandlers()
 
   logInfo('Application starting')
-  createWindow()
 
-  // Check if configured port is in use (for dev/production server)
+  // Check the configured dev server port before opening the main window.
   if (isDev) {
     const serverPort = getServerPort()
     if (await isPortInUse(serverPort)) {
       logInfo(`Port ${serverPort} is in use, showing port conflict dialog`)
       await showPortConflictDialog(serverPort)
-      // After dialog, we should return here to wait for user action
       return
     }
   }
 
+  createWindow()
+
   if (!isDev) {
     initializeUpdater({
       onUpdateAvailable: () => {
-        BrowserWindow.getAllWindows().forEach((window) => {
-          window.webContents.send(ipc.IPC_APP_UPDATE_AVAILABLE, { available: true })
-        })
+        broadcastToAllWindows(ipc.IPC_APP_UPDATE_AVAILABLE, { available: true })
       },
       onDownloadProgress: (percent) => {
-        BrowserWindow.getAllWindows().forEach((window) => {
-          window.webContents.send(ipc.IPC_APP_UPDATE_PROGRESS, { percent })
-        })
+        broadcastToAllWindows(ipc.IPC_APP_UPDATE_PROGRESS, { percent })
       },
       onUpdateReady: () => {
-        BrowserWindow.getAllWindows().forEach((window) => {
-          window.webContents.send(ipc.IPC_APP_UPDATE_READY, { ready: true })
-        })
+        broadcastToAllWindows(ipc.IPC_APP_UPDATE_READY, { ready: true })
       },
       onUpdateError: (message) => {
-        BrowserWindow.getAllWindows().forEach((window) => {
-          window.webContents.send(ipc.IPC_APP_UPDATE_ERROR, { message })
-        })
+        broadcastToAllWindows(ipc.IPC_APP_UPDATE_ERROR, { message })
       },
     })
   }
-  initializeTray()
 
   // Initialize IPC handlers
   registerAllHandlers()
@@ -353,10 +228,6 @@ app.on('ready', async () => {
   // Initialize and start timer engine
   initializeTimersFromStore()
   startTimerEngine()
-})
-
-app.on('before-quit', () => {
-  isQuitting = true
 })
 
 app.on('window-all-closed', () => {
@@ -369,7 +240,6 @@ app.on('activate', () => {
   if (mainWindow === null) {
     createWindow()
   } else {
-    mainWindow.setSkipTaskbar(false)
     mainWindow.show()
     mainWindow.focus()
   }

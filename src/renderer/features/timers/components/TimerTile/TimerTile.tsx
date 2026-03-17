@@ -2,16 +2,38 @@
  * TimerTile component - individual timer display with all clock modes
  */
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { createTimerStore } from '../../store/timerStore'
 import { DigitalClock } from '../ClockFaces/DigitalClock'
 import { AnalogClock } from '../ClockFaces/AnalogClock'
 import { RingClock } from '../ClockFaces/RingClock'
 import { FlipClock } from '../ClockFaces/FlipClock'
-import { MascotDisplay } from '../MascotDisplay/MascotDisplay'
-import { useGlobalStore } from '../../store/globalStore'
+import { MascotDisplay } from '../../../../components/MascotDisplay/MascotDisplay'
+import { TimerActions } from './TimerActions'
+import {
+  TimerSplitStatsSection,
+  type SplitStatsOption,
+  type SplitStatsView,
+} from './TimerSplitStatsSection'
+import { useGlobalStore } from '../../../../store/globalStore'
+import { useIpcSubscription } from '../../../../hooks/useIpcSubscription'
+import { clampPercent, minutesToSeconds, sanitizePositiveInt } from '../../utils/timerMath'
+import { getPhaseTotalSeconds, getResolvedPhaseLabel } from '../../utils/timerPhase'
+import { fileToDataUrl } from '../../../../utils/fileToDataUrl'
+import { getPlayPauseLabel } from '../../utils/timerControls'
+import { getPeriodValueForSplitView } from '../../utils/timerStats'
 import styles from './TimerTile.module.css'
 import { formatTimeHuman, generateId } from '@shared/utils'
+import {
+  DEFAULT_GENERIC_DURATION,
+  DEFAULT_SIT_DURATION,
+  DEFAULT_STAND_DURATION,
+  DEFAULT_POMODORO_WORK,
+  DEFAULT_POMODORO_SHORT_BREAK,
+  DEFAULT_POMODORO_LONG_BREAK,
+  DEFAULT_POMODORO_ROUNDS_BEFORE_LONG,
+  DEFAULT_MASCOT_SIZE,
+} from '@shared/constants'
 import type {
   TimerState,
   ClockDisplayMode,
@@ -20,7 +42,7 @@ import type {
   MascotAnimationCue,
   MascotAnimationType,
   TimerPeriodStats,
-} from '../../../types/index'
+} from '../../../../../types/index'
 
 interface TimerTileProps {
   id: string
@@ -81,7 +103,6 @@ const PERIODS: Array<{ key: keyof TimerPeriodStats; label: string }> = [
   { key: 'month', label: 'Month' },
   { key: 'year', label: 'Year' },
 ]
-type SplitStatsView = 'sit' | 'stand' | 'work' | 'break'
 const createEmptyTimerBreakdown = (): TimerPeriodStats['day'] => ({
   totalTime: 0,
   sitTime: 0,
@@ -96,6 +117,14 @@ const EMPTY_TIMER_PERIOD_STATS: TimerPeriodStats = {
   month: createEmptyTimerBreakdown(),
   year: createEmptyTimerBreakdown(),
 }
+const SIT_STAND_STATS_OPTIONS: SplitStatsOption[] = [
+  { key: 'sit', label: 'Sit' },
+  { key: 'stand', label: 'Stand' },
+]
+const POMODORO_STATS_OPTIONS: SplitStatsOption[] = [
+  { key: 'work', label: 'Work' },
+  { key: 'break', label: 'Break' },
+]
 
 const getThemeAccentColor = () => {
   if (typeof window === 'undefined') {
@@ -146,60 +175,6 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   onTimerConfigChange,
   onDeleteTimer,
 }) => {
-  const getResolvedPhaseLabel = (
-    type: TimerConfig['type'],
-    mode: TimerConfig['mode'],
-    currentPhaseLabel?: string,
-  ) => {
-    if (type === 'sit-stand') {
-      return currentPhaseLabel === 'Standing' ? 'Standing' : 'Sitting'
-    }
-
-    if (type === 'pomodoro') {
-      if (currentPhaseLabel === 'Short Break' || currentPhaseLabel === 'Long Break') {
-        return currentPhaseLabel
-      }
-
-      return 'Work'
-    }
-
-    return mode === 'countup' ? 'Counting Up' : 'Countdown'
-  }
-
-  const getPhaseTotalSeconds = (
-    config: {
-      type: TimerConfig['type']
-      mode: TimerConfig['mode']
-      duration?: number
-      sitDuration?: number
-      standDuration?: number
-      workDuration?: number
-      shortBreakDuration?: number
-      longBreakDuration?: number
-    },
-    currentPhaseLabel?: string,
-  ) => {
-    const resolvedPhaseLabel = getResolvedPhaseLabel(
-      config.type,
-      config.mode,
-      currentPhaseLabel,
-    )
-
-    if (config.type === 'sit-stand') {
-      return resolvedPhaseLabel === 'Standing'
-        ? (config.standDuration ?? 5 * 60)
-        : (config.sitDuration ?? 25 * 60)
-    }
-
-    if (config.type === 'pomodoro') {
-      if (resolvedPhaseLabel === 'Work') return config.workDuration ?? 25 * 60
-      if (resolvedPhaseLabel === 'Long Break') return config.longBreakDuration ?? 15 * 60
-      return config.shortBreakDuration ?? 5 * 60
-    }
-
-    return config.duration ?? 10 * 60
-  }
-
   const getCurrentConfigSnapshot = () => ({
     type: timerType,
     mode: timerMode,
@@ -228,12 +203,14 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   )
   const [editableLabel, setEditableLabel] = useState(label)
   const [editableTimerMode, setEditableTimerMode] = useState(timerMode)
-  const [editableDurationMinutes, setEditableDurationMinutes] = useState(Math.round((duration ?? 1500) / 60))
+  const [editableDurationMinutes, setEditableDurationMinutes] = useState(
+    Math.round((duration ?? DEFAULT_GENERIC_DURATION) / 60),
+  )
   const [editableSitDurationMinutes, setEditableSitDurationMinutes] = useState(
-    Math.round((sitDuration ?? 25 * 60) / 60),
+    Math.round((sitDuration ?? DEFAULT_SIT_DURATION) / 60),
   )
   const [editableStandDurationMinutes, setEditableStandDurationMinutes] = useState(
-    Math.round((standDuration ?? 5 * 60) / 60),
+    Math.round((standDuration ?? DEFAULT_STAND_DURATION) / 60),
   )
   const [editableAutoLoop, setEditableAutoLoop] = useState(autoLoop)
   const [editableContinueFromLastTime, setEditableContinueFromLastTime] =
@@ -241,15 +218,17 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   const [editableContinueWhileAppClosed, setEditableContinueWhileAppClosed] =
     useState(false)
   const [editableWorkDurationMinutes, setEditableWorkDurationMinutes] = useState(
-    Math.round((workDuration ?? 25 * 60) / 60),
+    Math.round((workDuration ?? DEFAULT_POMODORO_WORK) / 60),
   )
   const [editableShortBreakMinutes, setEditableShortBreakMinutes] = useState(
-    Math.round((shortBreakDuration ?? 5 * 60) / 60),
+    Math.round((shortBreakDuration ?? DEFAULT_POMODORO_SHORT_BREAK) / 60),
   )
   const [editableLongBreakMinutes, setEditableLongBreakMinutes] = useState(
-    Math.round((longBreakDuration ?? 15 * 60) / 60),
+    Math.round((longBreakDuration ?? DEFAULT_POMODORO_LONG_BREAK) / 60),
   )
-  const [editablePomodoroRounds, setEditablePomodoroRounds] = useState(roundsBeforeLongBreak ?? 4)
+  const [editablePomodoroRounds, setEditablePomodoroRounds] = useState(
+    roundsBeforeLongBreak ?? DEFAULT_POMODORO_ROUNDS_BEFORE_LONG,
+  )
   const [editableIncludeSitInStats, setEditableIncludeSitInStats] = useState(
     includeSitInStats ?? true,
   )
@@ -286,7 +265,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     useState(useGlobalMascotSettings)
   const [editableMascotImagePath, setEditableMascotImagePath] = useState(mascotImagePath || '')
   const [editableMascotSize, setEditableMascotSize] = useState(
-    mascotSize ?? (globalSettings.mascotSize ?? 100),
+    mascotSize ?? (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE),
   )
   const [editableMascotScale, setEditableMascotScale] = useState(
     mascotScale ?? (globalSettings.mascotScale ?? 0.65),
@@ -329,7 +308,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   }, [timerStore])
 
   // Subscribe to IPC timer tick events
-  useEffect(() => {
+  useIpcSubscription(() => {
     const handleTimerTick = (data: any) => {
       if (data?.id === id) {
         setState((prev) => ({
@@ -343,10 +322,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
       }
     }
 
-    const unsubscribe = window.electronAPI?.onTimerTick(handleTimerTick)
-    return () => {
-      unsubscribe?.()
-    }
+    return window.electronAPI?.onTimerTick(handleTimerTick)
   }, [id])
 
   useEffect(() => {
@@ -358,15 +334,15 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   }, [timerMode])
 
   useEffect(() => {
-    setEditableDurationMinutes(Math.round((duration ?? 1500) / 60))
+    setEditableDurationMinutes(Math.round((duration ?? DEFAULT_GENERIC_DURATION) / 60))
   }, [duration])
 
   useEffect(() => {
-    setEditableSitDurationMinutes(Math.round((sitDuration ?? 25 * 60) / 60))
+    setEditableSitDurationMinutes(Math.round((sitDuration ?? DEFAULT_SIT_DURATION) / 60))
   }, [sitDuration])
 
   useEffect(() => {
-    setEditableStandDurationMinutes(Math.round((standDuration ?? 5 * 60) / 60))
+    setEditableStandDurationMinutes(Math.round((standDuration ?? DEFAULT_STAND_DURATION) / 60))
   }, [standDuration])
 
   useEffect(() => {
@@ -386,19 +362,19 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   }, [continueWhileAppClosed, globalSettings.defaultContinueWhileAppClosed])
 
   useEffect(() => {
-    setEditableWorkDurationMinutes(Math.round((workDuration ?? 25 * 60) / 60))
+    setEditableWorkDurationMinutes(Math.round((workDuration ?? DEFAULT_POMODORO_WORK) / 60))
   }, [workDuration])
 
   useEffect(() => {
-    setEditableShortBreakMinutes(Math.round((shortBreakDuration ?? 5 * 60) / 60))
+    setEditableShortBreakMinutes(Math.round((shortBreakDuration ?? DEFAULT_POMODORO_SHORT_BREAK) / 60))
   }, [shortBreakDuration])
 
   useEffect(() => {
-    setEditableLongBreakMinutes(Math.round((longBreakDuration ?? 15 * 60) / 60))
+    setEditableLongBreakMinutes(Math.round((longBreakDuration ?? DEFAULT_POMODORO_LONG_BREAK) / 60))
   }, [longBreakDuration])
 
   useEffect(() => {
-    setEditablePomodoroRounds(roundsBeforeLongBreak ?? 4)
+    setEditablePomodoroRounds(roundsBeforeLongBreak ?? DEFAULT_POMODORO_ROUNDS_BEFORE_LONG)
   }, [roundsBeforeLongBreak])
 
   useEffect(() => {
@@ -429,29 +405,45 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     setEditableAccentColor(resolvedAccentColor || themeAccentColor)
   }, [resolvedAccentColor, themeAccentColor, globalSettings.theme])
 
-  useEffect(() => {
+  useIpcSubscription(() => {
     const handleMascotAnimate = (data: { id?: string; animation?: MascotAnimationType }) => {
       if (data?.id !== id || !data.animation) return
       setMascotAnimationType(data.animation)
       setMascotAnimationNonce((value) => value + 1)
     }
 
-    const unsubscribe = window.electronAPI?.onMascotAnimate(handleMascotAnimate)
-    return () => {
-      unsubscribe?.()
-    }
+    return window.electronAPI?.onMascotAnimate(handleMascotAnimate)
   }, [id])
 
-  useEffect(() => {
+  useIpcSubscription(() => {
     const handleTimerStateUpdate = (data: { states?: Record<string, TimerState> }) => {
       const nextState = data?.states?.[id]
       if (!nextState) return
       setState(nextState)
     }
 
-    const unsubscribe = window.electronAPI?.onTimerStateUpdate(handleTimerStateUpdate)
+    return window.electronAPI?.onTimerStateUpdate(handleTimerStateUpdate)
+  }, [id])
+
+  useEffect(() => {
+    let isDisposed = false
+
+    const hydrateTimerState = async () => {
+      try {
+        const result = await window.electronAPI?.getTimerState(id)
+        const nextState = result?.success ? result.data : null
+        if (!isDisposed && nextState) {
+          setState(nextState)
+        }
+      } catch {
+        // Ignore transient startup IPC issues.
+      }
+    }
+
+    hydrateTimerState()
+
     return () => {
-      unsubscribe?.()
+      isDisposed = true
     }
   }, [id])
 
@@ -473,15 +465,18 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   }, [id, isStatsFlipped])
 
   useEffect(() => {
+    if (isCompact) {
+      setIsStatsFlipped(false)
+    }
+  }, [isCompact])
+
+  useIpcSubscription(() => {
     const handleStatsUpdate = () => {
       if (!isStatsFlipped) return
       loadTimerStats()
     }
 
-    const unsubscribe = window.electronAPI?.onStatsUpdate(handleStatsUpdate)
-    return () => {
-      unsubscribe?.()
-    }
+    return window.electronAPI?.onStatsUpdate(handleStatsUpdate)
   }, [isStatsFlipped])
 
   useEffect(() => {
@@ -506,7 +501,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   }, [mascotImagePath])
 
   useEffect(() => {
-    setEditableMascotSize(mascotSize ?? (globalSettings.mascotSize ?? 100))
+    setEditableMascotSize(mascotSize ?? (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE))
   }, [mascotSize, globalSettings.mascotSize])
 
   useEffect(() => {
@@ -547,43 +542,61 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     }
   }
 
-  const handlePlayPause = async () => {
+  const runTimerAction = async (action: () => Promise<void>) => {
     setIsLoading(true)
     try {
-      if (state.phase === 'running') {
-        await window.electronAPI?.pauseTimer(id)
-        setState((prev) => ({ ...prev, phase: 'paused' }))
-      } else if (state.phase === 'paused') {
-        await window.electronAPI?.resumeTimer(id)
-        setState((prev) => ({ ...prev, phase: 'running' }))
-      } else {
-        await window.electronAPI?.startTimer(id)
-        setState((prev) => ({ ...prev, phase: 'running' }))
-      }
-    } catch (error) {
-      console.error('Error toggling timer:', error)
+      await action()
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handlePlayPause = async () => {
+    await runTimerAction(async () => {
+      try {
+        if (state.phase === 'running') {
+          await window.electronAPI?.pauseTimer(id)
+          setState((prev) => ({ ...prev, phase: 'paused' }))
+          return
+        }
+
+        if (state.phase === 'paused') {
+          await window.electronAPI?.resumeTimer(id)
+          setState((prev) => ({ ...prev, phase: 'running' }))
+          return
+        }
+
+        await window.electronAPI?.startTimer(id)
+        setState((prev) => ({ ...prev, phase: 'running' }))
+      } catch (error) {
+        console.error('Error toggling timer:', error)
+      }
+    })
+  }
+
   const handleReset = async () => {
-    setIsLoading(true)
-    try {
-      await window.electronAPI?.resetTimer(id)
-      setState((prev) => ({
-        ...prev,
-        phase: 'idle',
-        timeElapsed: 0,
-        timeRemaining: getCurrentPhaseTotal(prev.currentPhaseLabel),
-        currentPhaseLabel: getResolvedPhaseLabel(timerType, timerMode, prev.currentPhaseLabel),
-        lastUpdatedAt: Date.now(),
-      }))
-    } catch (error) {
-      console.error('Error resetting timer:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    await runTimerAction(async () => {
+      try {
+        await window.electronAPI?.resetTimer(id)
+        setState((prev) => ({
+          ...prev,
+          phase: 'idle',
+          timeElapsed: 0,
+          timeRemaining: getCurrentPhaseTotal(prev.currentPhaseLabel),
+          currentPhaseLabel: getResolvedPhaseLabel(timerType, timerMode, prev.currentPhaseLabel),
+          lastUpdatedAt: Date.now(),
+        }))
+
+        if (isStatsFlipped) {
+          await loadTimerStats()
+          setTimeout(() => {
+            void loadTimerStats()
+          }, 200)
+        }
+      } catch (error) {
+        console.error('Error resetting timer:', error)
+      }
+    })
   }
 
   const handleDisplayModeChange = (mode: ClockDisplayMode) => {
@@ -623,6 +636,16 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     setEditableAlertCues((prev) => prev.filter((cue) => cue.id !== cueId))
   }
 
+  const browseAlertCueSound = async (cueId: string) => {
+    try {
+      const result = await window.electronAPI?.pickSoundFile()
+      if (!result?.success || !result.filePath) return
+      updateAlertCue(cueId, { soundPath: result.filePath })
+    } catch (error) {
+      console.error('Error selecting alert sound file:', error)
+    }
+  }
+
   const addMascotAnimationCue = () => {
     setEditableMascotAnimationCues((prev) => [
       ...prev,
@@ -647,20 +670,25 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     const file = event.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === 'string' ? reader.result : ''
-      setEditableMascotImagePath(result)
-    }
-    reader.readAsDataURL(file)
+    fileToDataUrl(file)
+      .then((result) => setEditableMascotImagePath(result))
+      .catch((error) => console.error('Error reading mascot file:', error))
   }
 
   const saveTimerSettings = () => {
+    const genericDurationSeconds = minutesToSeconds(editableDurationMinutes, 25)
+    const sitDurationSeconds = minutesToSeconds(editableSitDurationMinutes, 25)
+    const standDurationSeconds = minutesToSeconds(editableStandDurationMinutes, 5)
+    const workDurationSeconds = minutesToSeconds(editableWorkDurationMinutes, 25)
+    const shortBreakSeconds = minutesToSeconds(editableShortBreakMinutes, 5)
+    const longBreakSeconds = minutesToSeconds(editableLongBreakMinutes, 15)
+    const pomodoroRounds = sanitizePositiveInt(editablePomodoroRounds, 4)
+
     const cleanedAlertCues = editableAlertCues
       .filter((cue) => cue.soundPath.trim().length > 0)
       .map((cue) => ({
         ...cue,
-        thresholdPercent: Math.max(1, Math.min(99, Math.round(cue.thresholdPercent))),
+        thresholdPercent: clampPercent(cue.thresholdPercent, 1, 99),
         soundPath: cue.soundPath.trim(),
       }))
 
@@ -681,15 +709,15 @@ export const TimerTile: React.FC<TimerTileProps> = ({
       timerType === 'generic'
         ? {
             mode: editableTimerMode,
-            duration: Math.max(1, Math.round(editableDurationMinutes)) * 60,
+            duration: genericDurationSeconds,
             continueFromLastTime: continueFromLastTimeUpdate,
             continueWhileAppClosed: continueWhileAppClosedUpdate,
           }
         : timerType === 'sit-stand'
           ? {
               mode: editableTimerMode,
-              sitDuration: Math.max(1, Math.round(editableSitDurationMinutes)) * 60,
-              standDuration: Math.max(1, Math.round(editableStandDurationMinutes)) * 60,
+              sitDuration: sitDurationSeconds,
+              standDuration: standDurationSeconds,
               autoLoop: editableAutoLoop,
               includeSitInStats: editableIncludeSitInStats,
               includeStandInStats: editableIncludeStandInStats,
@@ -698,10 +726,10 @@ export const TimerTile: React.FC<TimerTileProps> = ({
             }
           : {
               mode: editableTimerMode,
-              workDuration: Math.max(1, Math.round(editableWorkDurationMinutes)) * 60,
-              shortBreakDuration: Math.max(1, Math.round(editableShortBreakMinutes)) * 60,
-              longBreakDuration: Math.max(1, Math.round(editableLongBreakMinutes)) * 60,
-              roundsBeforeLongBreak: Math.max(1, Math.round(editablePomodoroRounds)),
+              workDuration: workDurationSeconds,
+              shortBreakDuration: shortBreakSeconds,
+              longBreakDuration: longBreakSeconds,
+              roundsBeforeLongBreak: pomodoroRounds,
               includePomodoroWorkInStats: editableIncludePomodoroWorkInStats,
               includePomodoroBreakInStats: editableIncludePomodoroBreakInStats,
               continueFromLastTime: continueFromLastTimeUpdate,
@@ -714,7 +742,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
       accentColor: accentColorUpdate,
       alertVolume: editableUseGlobalAlertVolume
         ? undefined
-        : Math.max(0, Math.min(100, Math.round(editableAlertVolume))),
+        : clampPercent(editableAlertVolume),
       useGlobalAlertCues: editableUseGlobalAlertCues,
       alertCues: cleanedAlertCues,
       useGlobalMascotSettings: editableUseGlobalMascotSettings,
@@ -727,7 +755,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
       useGlobalMascotAnimationCues: editableUseGlobalMascotCues,
       mascotAnimationCues: editableMascotAnimationCues.map((cue) => ({
         ...cue,
-        thresholdPercent: Math.max(1, Math.min(99, Math.round(cue.thresholdPercent))),
+        thresholdPercent: clampPercent(cue.thresholdPercent, 1, 99),
       })),
     }
 
@@ -736,14 +764,14 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     const didTimingChange =
       editableTimerMode !== timerMode ||
       (timerType === 'generic' &&
-        Math.max(1, Math.round(editableDurationMinutes)) * 60 !== (duration ?? 10 * 60)) ||
+        genericDurationSeconds !== (duration ?? 10 * 60)) ||
       (timerType === 'sit-stand' &&
-        (Math.max(1, Math.round(editableSitDurationMinutes)) * 60 !== (sitDuration ?? 25 * 60) ||
-          Math.max(1, Math.round(editableStandDurationMinutes)) * 60 !== (standDuration ?? 5 * 60))) ||
+        (sitDurationSeconds !== (sitDuration ?? 25 * 60) ||
+          standDurationSeconds !== (standDuration ?? 5 * 60))) ||
       (timerType === 'pomodoro' &&
-        (Math.max(1, Math.round(editableWorkDurationMinutes)) * 60 !== (workDuration ?? 25 * 60) ||
-          Math.max(1, Math.round(editableShortBreakMinutes)) * 60 !== (shortBreakDuration ?? 5 * 60) ||
-          Math.max(1, Math.round(editableLongBreakMinutes)) * 60 !== (longBreakDuration ?? 15 * 60)))
+        (workDurationSeconds !== (workDuration ?? 25 * 60) ||
+          shortBreakSeconds !== (shortBreakDuration ?? 5 * 60) ||
+          longBreakSeconds !== (longBreakDuration ?? 15 * 60)))
 
     if (didTimingChange) {
       const nextPhaseLabel = getResolvedPhaseLabel(
@@ -757,27 +785,27 @@ export const TimerTile: React.FC<TimerTileProps> = ({
           mode: editableTimerMode,
           duration:
             timerType === 'generic'
-              ? Math.max(1, Math.round(editableDurationMinutes)) * 60
+              ? genericDurationSeconds
               : duration,
           sitDuration:
             timerType === 'sit-stand'
-              ? Math.max(1, Math.round(editableSitDurationMinutes)) * 60
+              ? sitDurationSeconds
               : sitDuration,
           standDuration:
             timerType === 'sit-stand'
-              ? Math.max(1, Math.round(editableStandDurationMinutes)) * 60
+              ? standDurationSeconds
               : standDuration,
           workDuration:
             timerType === 'pomodoro'
-              ? Math.max(1, Math.round(editableWorkDurationMinutes)) * 60
+              ? workDurationSeconds
               : workDuration,
           shortBreakDuration:
             timerType === 'pomodoro'
-              ? Math.max(1, Math.round(editableShortBreakMinutes)) * 60
+              ? shortBreakSeconds
               : shortBreakDuration,
           longBreakDuration:
             timerType === 'pomodoro'
-              ? Math.max(1, Math.round(editableLongBreakMinutes)) * 60
+              ? longBreakSeconds
               : longBreakDuration,
         },
         nextPhaseLabel,
@@ -795,13 +823,12 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     setIsSettingsOpen(false)
   }
 
-  const isRunning = state.phase === 'running'
-  const isPaused = state.phase === 'paused'
+  const playPauseLabel = getPlayPauseLabel(state.phase)
   const effectiveMascotImagePath =
     useGlobalMascotSettings === false ? mascotImagePath : globalSettings.mascotImagePath
   const effectiveMascotSize = useGlobalMascotSettings === false
-    ? (mascotSize ?? 100)
-    : (globalSettings.mascotSize ?? 100)
+    ? (mascotSize ?? DEFAULT_MASCOT_SIZE)
+    : (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE)
   const effectiveMascotScale = useGlobalMascotSettings === false
     ? (mascotScale ?? 0.65)
     : (globalSettings.mascotScale ?? 0.65)
@@ -809,57 +836,10 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     ? (mascotPosition ?? 'top-right')
     : (globalSettings.mascotPosition ?? 'top-right')
 
-  const liveCycleSeconds = useMemo(() => {
-    if (state.phase !== 'running' && state.phase !== 'paused') {
-      return 0
-    }
-
-    return Math.max(0, Math.round(state.timeElapsed || 0))
-  }, [state.phase, state.timeElapsed])
-
-  const displayedTimerStats = useMemo<TimerPeriodStats>(() => {
-    if (liveCycleSeconds <= 0) {
-      return timerStats
-    }
-
-    const resolvedPhaseLabel = getResolvedPhaseLabel(
-      timerType,
-      timerMode,
-      state.currentPhaseLabel,
-    )
-
-    const targetCategory: keyof TimerPeriodStats['day'] =
-      timerType === 'sit-stand'
-        ? resolvedPhaseLabel === 'Standing'
-          ? 'standTime'
-          : 'sitTime'
-        : timerType === 'pomodoro'
-          ? resolvedPhaseLabel === 'Short Break' || resolvedPhaseLabel === 'Long Break'
-            ? 'pomodoroBreakTime'
-            : 'pomodoroWorkTime'
-          : 'genericTimerTime'
-
-    const withLiveCycle = (breakdown: TimerPeriodStats['day']): TimerPeriodStats['day'] => ({
-      ...breakdown,
-      totalTime: breakdown.totalTime + liveCycleSeconds,
-      [targetCategory]: breakdown[targetCategory] + liveCycleSeconds,
-    })
-
-    return {
-      day: withLiveCycle(timerStats.day),
-      week: withLiveCycle(timerStats.week),
-      month: withLiveCycle(timerStats.month),
-      year: withLiveCycle(timerStats.year),
-    }
-  }, [liveCycleSeconds, timerStats, timerType, timerMode, state.currentPhaseLabel])
+  const displayedTimerStats = timerStats
 
   const getPeriodValueForView = (period: keyof TimerPeriodStats, view: SplitStatsView): number => {
-    const breakdown = displayedTimerStats[period]
-
-    if (view === 'sit') return breakdown.sitTime
-    if (view === 'stand') return breakdown.standTime
-    if (view === 'work') return breakdown.pomodoroWorkTime
-    return breakdown.pomodoroBreakTime
+    return getPeriodValueForSplitView(displayedTimerStats, period, view)
   }
 
   return (
@@ -930,22 +910,12 @@ export const TimerTile: React.FC<TimerTileProps> = ({
               />
             </div>
 
-            <div className={styles.controls}>
-              <button
-                className={`${styles.controlButton} ${styles.playPauseBtn}`}
-                onClick={handlePlayPause}
-                disabled={isLoading}
-              >
-                {isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start'}
-              </button>
-              <button
-                className={`${styles.controlButton} ${styles.resetBtn}`}
-                onClick={handleReset}
-                disabled={isLoading}
-              >
-                Reset
-              </button>
-            </div>
+            <TimerActions
+              playPauseLabel={playPauseLabel}
+              isLoading={isLoading}
+              onPlayPause={handlePlayPause}
+              onReset={handleReset}
+            />
           </div>
 
           <div className={styles.faceBack}>
@@ -963,63 +933,21 @@ export const TimerTile: React.FC<TimerTileProps> = ({
                   ))}
                 </div>
               ) : timerType === 'sit-stand' ? (
-                <div className={styles.statsSections}>
-                  <div className={styles.statsToggleRow}>
-                    <button
-                      className={`${styles.statsToggleButton} ${splitStatsView === 'sit' ? styles.statsToggleButtonActive : ''}`}
-                      onClick={() => setSplitStatsView('sit')}
-                      type="button"
-                    >
-                      Sit
-                    </button>
-                    <button
-                      className={`${styles.statsToggleButton} ${splitStatsView === 'stand' ? styles.statsToggleButtonActive : ''}`}
-                      onClick={() => setSplitStatsView('stand')}
-                      type="button"
-                    >
-                      Stand
-                    </button>
-                  </div>
-                  <div className={styles.statsGrid}>
-                    {PERIODS.map((period) => (
-                      <div key={`${splitStatsView}-${period.key}`} className={styles.statsCard}>
-                        <span className={styles.statsLabel}>{period.label}</span>
-                        <strong className={styles.statsValue}>
-                          {formatTimeHuman(getPeriodValueForView(period.key, splitStatsView))}
-                        </strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <TimerSplitStatsSection
+                  options={SIT_STAND_STATS_OPTIONS}
+                  splitStatsView={splitStatsView}
+                  setSplitStatsView={setSplitStatsView}
+                  periods={PERIODS}
+                  getPeriodValueForView={getPeriodValueForView}
+                />
               ) : (
-                <div className={styles.statsSections}>
-                  <div className={styles.statsToggleRow}>
-                    <button
-                      className={`${styles.statsToggleButton} ${splitStatsView === 'work' ? styles.statsToggleButtonActive : ''}`}
-                      onClick={() => setSplitStatsView('work')}
-                      type="button"
-                    >
-                      Work
-                    </button>
-                    <button
-                      className={`${styles.statsToggleButton} ${splitStatsView === 'break' ? styles.statsToggleButtonActive : ''}`}
-                      onClick={() => setSplitStatsView('break')}
-                      type="button"
-                    >
-                      Break
-                    </button>
-                  </div>
-                  <div className={styles.statsGrid}>
-                    {PERIODS.map((period) => (
-                      <div key={`${splitStatsView}-${period.key}`} className={styles.statsCard}>
-                        <span className={styles.statsLabel}>{period.label}</span>
-                        <strong className={styles.statsValue}>
-                          {formatTimeHuman(getPeriodValueForView(period.key, splitStatsView))}
-                        </strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <TimerSplitStatsSection
+                  options={POMODORO_STATS_OPTIONS}
+                  splitStatsView={splitStatsView}
+                  setSplitStatsView={setSplitStatsView}
+                  periods={PERIODS}
+                  getPeriodValueForView={getPeriodValueForView}
+                />
               )}
               {isStatsLoading && <p className={styles.statsHint}>Loading stats…</p>}
             </div>
@@ -1299,18 +1227,21 @@ export const TimerTile: React.FC<TimerTileProps> = ({
                   {!editableUseGlobalAlertCues && (
                     <div className={styles.alertCueList}>
                       {editableAlertCues.map((cue) => (
-                        <div key={cue.id} className={styles.alertCueRow}>
-                          <input
-                            className={styles.settingsNumberInput}
-                            type="number"
-                            min={1}
-                            max={99}
-                            value={cue.thresholdPercent}
-                            onChange={(event) =>
-                              updateAlertCue(cue.id, { thresholdPercent: Number(event.target.value) })
-                            }
-                          />
-                          <span className={styles.percentLabel}>%</span>
+                        <div key={cue.id} className={styles.alertCueCard}>
+                          <div className={styles.alertCueThresholdRow}>
+                            <span className={styles.alertCueThresholdLabel}>Sound will play when timer is at</span>
+                            <input
+                              className={styles.settingsNumberInput}
+                              type="number"
+                              min={1}
+                              max={99}
+                              value={cue.thresholdPercent}
+                              onChange={(event) =>
+                                updateAlertCue(cue.id, { thresholdPercent: Number(event.target.value) })
+                              }
+                            />
+                            <span className={styles.percentLabel}>%</span>
+                          </div>
                           <input
                             className={styles.settingsInput}
                             type="text"
@@ -1320,12 +1251,22 @@ export const TimerTile: React.FC<TimerTileProps> = ({
                               updateAlertCue(cue.id, { soundPath: event.target.value })
                             }
                           />
-                          <button
-                            className={styles.removeCueButton}
-                            onClick={() => removeAlertCue(cue.id)}
-                          >
-                            Remove
-                          </button>
+                          <div className={styles.alertCueActionsRow}>
+                            <button
+                              type="button"
+                              className={styles.browseCueButton}
+                              onClick={() => browseAlertCueSound(cue.id)}
+                            >
+                              Browse
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.removeCueButton}
+                              onClick={() => removeAlertCue(cue.id)}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                       ))}
                       <button className={styles.addCueButton} onClick={addAlertCue}>
@@ -1347,15 +1288,37 @@ export const TimerTile: React.FC<TimerTileProps> = ({
                   </label>
                   {!editableUseGlobalMascotSettings && (
                     <>
-                      <label className={styles.settingsField}>
+                      <div className={styles.settingsField}>
                         Mascot Image
-                        <input
-                          className={styles.settingsFileInput}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleMascotUpload}
-                        />
-                      </label>
+                        <div className={styles.mascotUploadContainer}>
+                          {editableMascotImagePath && (
+                            <div className={styles.mascotPreviewWrapper}>
+                              <img
+                                src={editableMascotImagePath}
+                                alt="Current mascot"
+                                className={styles.mascotPreview}
+                              />
+                              <button
+                                className={styles.clearButton}
+                                onClick={() => setEditableMascotImagePath('')}
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+                          <label className={styles.fileInputLabel}>
+                            <input
+                              className={styles.settingsFileInput}
+                              type="file"
+                              accept="image/*"
+                              onChange={handleMascotUpload}
+                            />
+                            <span className={styles.fileInputButton}>
+                              {editableMascotImagePath ? 'Change Mascot' : 'Choose File'}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
                       <label className={styles.settingsField}>
                         Mascot Size
                         <input
@@ -1497,9 +1460,6 @@ export const TimerTile: React.FC<TimerTileProps> = ({
         </div>
       )}
 
-      {state.phase === 'paused' && !isStatsFlipped && (
-        <div className={styles.badge}>⏸ PAUSED</div>
-      )}
     </div>
   )
 }
