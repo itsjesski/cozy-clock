@@ -71,7 +71,10 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          artifacts: 'dist/*.exe'
+          artifacts: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest*.yml
           draft: false
           prerelease: false
           makeLatest: true

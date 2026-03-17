@@ -7,7 +7,7 @@ import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import * as ipc from '../../shared/ipc'
-import { installDownloadedUpdate, startUpdateDownload } from '../services/updater'
+import { getUpdaterStatus, installDownloadedUpdate, startUpdateDownload } from '../services/updater'
 import { getLogDirectory, logError } from '../services/logger'
 
 function inferAudioMimeType(filePath: string): string {
@@ -114,6 +114,10 @@ export function registerAppHandlers(): void {
 
   ipcMain.handle(ipc.IPC_APP_UPDATE_DOWNLOAD, async () => {
     return startUpdateDownload()
+  })
+
+  ipcMain.handle(ipc.IPC_APP_UPDATE_STATUS, async () => {
+    return { success: true, data: getUpdaterStatus() }
   })
 
   ipcMain.handle(ipc.IPC_APP_UPDATE_INSTALL, async () => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useIpcSubscription } from '../../../hooks/useIpcSubscription'
 
 export function useUpdaterModal() {
@@ -17,6 +17,48 @@ export function useUpdaterModal() {
     setUpdateStatus('Preparing download...')
     setIsDownloadingUpdate(true)
   }
+
+  useEffect(() => {
+    let isDisposed = false
+
+    const hydrateUpdateStatus = async () => {
+      try {
+        const result = await window.electronAPI?.getUpdateStatus()
+        if (!result?.success || !result.data || isDisposed) {
+          return
+        }
+
+        const data = result.data as {
+          isUpdateAvailable?: boolean
+          isDownloadingUpdate?: boolean
+          isUpdateReady?: boolean
+          updateProgress?: number
+          updateError?: string | null
+        }
+
+        setIsUpdateAvailable(Boolean(data.isUpdateAvailable))
+        setIsDownloadingUpdate(Boolean(data.isDownloadingUpdate))
+        setIsUpdateReady(Boolean(data.isUpdateReady))
+        setUpdateProgress(Math.max(0, Math.min(100, Math.round(data.updateProgress || 0))))
+        setUpdateError(data.updateError ?? null)
+
+        if (data.isUpdateReady) {
+          setUpdateStatus('Download complete!')
+        } else if (data.isDownloadingUpdate) {
+          const percent = Math.max(0, Math.min(100, Math.round(data.updateProgress || 0)))
+          setUpdateStatus(`Downloading... ${percent}%`)
+        }
+      } catch {
+        // Ignore transient startup IPC errors.
+      }
+    }
+
+    void hydrateUpdateStatus()
+
+    return () => {
+      isDisposed = true
+    }
+  }, [])
 
   useIpcSubscription(() => {
     const unsubUpdateAvailable = window.electronAPI?.onUpdateAvailable(() => {

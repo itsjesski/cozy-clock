@@ -55,6 +55,7 @@ const api = {
   resolveSoundSource: (soundPath: string) =>
     ipcRenderer.invoke(ipc.IPC_APP_RESOLVE_SOUND_SOURCE, { soundPath }),
   startUpdateDownload: () => ipcRenderer.invoke(ipc.IPC_APP_UPDATE_DOWNLOAD),
+  getUpdateStatus: () => ipcRenderer.invoke(ipc.IPC_APP_UPDATE_STATUS),
   installDownloadedUpdate: () => ipcRenderer.invoke(ipc.IPC_APP_UPDATE_INSTALL),
   minimizeWindow: () => ipcRenderer.invoke(ipc.IPC_WINDOW_MINIMIZE),
   maximizeWindow: () => ipcRenderer.invoke(ipc.IPC_WINDOW_MAXIMIZE),
