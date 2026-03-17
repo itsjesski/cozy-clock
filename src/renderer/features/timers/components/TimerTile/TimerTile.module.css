@@ -197,6 +197,22 @@
   gap: 0.7rem;
 }
 
+.flipContent .faceFront {
+  pointer-events: auto;
+}
+
+.flipContent .faceBack {
+  pointer-events: none;
+}
+
+.flipContentFlipped .faceFront {
+  pointer-events: none;
+}
+
+.flipContentFlipped .faceBack {
+  pointer-events: auto;
+}
+
 .statsPanel {
   flex: 1;
   border: 1px solid var(--border-color);
