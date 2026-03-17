@@ -5,14 +5,14 @@ A customizable sit/stand, pomodoro, and generic timer desktop app with a cute, m
 ## Features
 
 - ✨ Three timer types: Sit/Stand, Pomodoro, Generic
-- 🎨 Multiple clock display modes: Digital, Analog, Ring, Flip, Minimal
-- 🎭 6 built-in themes with user-customizable accents
-- 🖼️ User-supplied mascot/character display
+- 🎨 Multiple clock display modes: Digital, Analog, Ring, Flip, and compact/minimal-friendly layouts
+- 🎭 10 built-in themes: Cozy, Sakura, Forest, Neon, and Paper in Light and Dark variants
+- 🖼️ User-supplied mascot/character display with global and per-timer overrides
 - 🎬 Streamer Mode for OBS capture (transparent windows)
 - ⏱️ Timer continuity: resume from last time or while app is closed
-- 🔊 Custom alert sounds per timer event
+- 🔊 Custom alert sounds with global defaults, per-timer overrides, and local file picker support
 - 💫 Optional inspirational messages at countdown milestones
-- 📊 Comprehensive stats dashboard (rolling + lifetime)
+- 📊 Comprehensive stats dashboard plus per-timer day/week/month/year breakdowns
 - 🎯 Low resource usage (tick engine in main process)
 - 🔄 Auto-update support (GitHub Releases)
 
@@ -40,7 +40,9 @@ npm install
 npm run dev
 ```
 
-This starts both the Vite dev server (on port 5173) and Electron in dev mode.
+This starts the Vite dev server and Electron in dev mode.
+
+The development server is bound to `127.0.0.1` and the app only trusts its own signed dev server instance.
 
 ### Build for Production
 
@@ -69,12 +71,14 @@ See [PLAN.md](PLAN.md) for detailed folder structure and architecture.
 ## Release Process
 
 1. Make commits with conventional commit messages (`feat:`, `fix:`, `chore:`, etc.)
-2. Run `npm run release`
-   - Bumps version in `package.json`
-   - Updates `CHANGELOG.md`
-   - Creates and pushes git tag
-3. GitHub Actions automatically builds and publishes the installer to GitHub Releases
-4. Users get auto-update notifications on next app launch
+2. Run one of:
+   - `npm run release` for the interactive flow
+   - `npm run release:patch`
+   - `npm run release:minor`
+   - `npm run release:major`
+3. The release script updates `CHANGELOG.md`, bumps the version, creates a git tag, and pushes everything
+4. GitHub Actions automatically builds and publishes the installer to GitHub Releases, using the newest `CHANGELOG.md` section as the release notes
+5. Users get auto-update notifications on next app launch
 
 ## Contributing
 
@@ -87,11 +91,3 @@ See [DEVELOPER.md](DEVELOPER.md) for detailed development information.
 ## License
 
 GPL-2.0-or-later. See [LICENSE](LICENSE) for details.
-
-## Credits
-
-Inspired by the low-resource-usage philosophy of [VRSleep](https://github.com/itsjesski/VRSleep).
-
----
-
-Built with ❤️ by [itsjesski](https://github.com/itsjesski)

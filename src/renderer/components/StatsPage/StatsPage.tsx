@@ -1,8 +1,4 @@
-/**
- * StatsPage component - stats dashboard
- */
-
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Bar,
   BarChart,
@@ -16,7 +12,7 @@ import {
 } from 'recharts'
 import { useStatsStore } from '../../store/statsStore'
 import { useGlobalStore } from '../../store/globalStore'
-import { formatTimeHuman } from '@shared/utils'
+import { formatTimeHuman, getDateKey } from '@shared/utils'
 import type { GlobalStats, StatsHistory, StatsPeriod, StatsResetScope } from '../../../types'
 import styles from './StatsPage.module.css'
 
@@ -48,13 +44,6 @@ const emptyStats = (): GlobalStats => ({
   genericTimerTime: 0,
   lastResetAt: Date.now(),
 })
-
-const getDateKey = (date: Date) => {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 const sumHistory = (entries: StatsHistory[]): GlobalStats =>
   entries.reduce<GlobalStats>(
@@ -106,7 +95,7 @@ const downloadTextFile = (filename: string, content: string, mimeType: string) =
   URL.revokeObjectURL(url)
 }
 
-export const StatsPage: React.FC<StatsPageProps> = ({ onBackToTimers }) => {
+export const StatsPage = ({ onBackToTimers }: StatsPageProps) => {
   const settings = useGlobalStore((state) => state.settings)
   const setSettings = useGlobalStore((state) => state.setSettings)
   const { stats, history, lifetimeStats, selectedPeriod, setOverview, setSelectedPeriod } = useStatsStore()
@@ -213,6 +202,21 @@ export const StatsPage: React.FC<StatsPageProps> = ({ onBackToTimers }) => {
     setResetScope(null)
   }
 
+  const renderStatCards = (values: GlobalStats, prefix?: string) => (
+    <div className={styles.cardGrid}>
+      {STAT_CARDS.map((card) => (
+        <div
+          key={prefix ? `${prefix}-${card.key}` : card.key}
+          className={styles.statCard}
+          style={{ ['--stat-accent' as string]: card.color }}
+        >
+          <span className={styles.statLabel}>{card.label}</span>
+          <strong className={styles.statValue}>{formatTimeHuman(values[card.key])}</strong>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -274,14 +278,7 @@ export const StatsPage: React.FC<StatsPageProps> = ({ onBackToTimers }) => {
           <h3 className={styles.sectionTitle}>{PERIOD_LABELS[selectedPeriod]}</h3>
           {isLoading && <span className={styles.mutedText}>Loading…</span>}
         </div>
-        <div className={styles.cardGrid}>
-          {STAT_CARDS.map((card) => (
-            <div key={card.key} className={styles.statCard} style={{ ['--stat-accent' as string]: card.color }}>
-              <span className={styles.statLabel}>{card.label}</span>
-              <strong className={styles.statValue}>{formatTimeHuman(selectedStats[card.key])}</strong>
-            </div>
-          ))}
-        </div>
+        {renderStatCards(selectedStats)}
       </section>
 
       <section className={styles.section}>
@@ -289,14 +286,7 @@ export const StatsPage: React.FC<StatsPageProps> = ({ onBackToTimers }) => {
           <h3 className={styles.sectionTitle}>Current Totals</h3>
           <span className={styles.mutedText}>Reset on demand or by schedule</span>
         </div>
-        <div className={styles.cardGrid}>
-          {STAT_CARDS.map((card) => (
-            <div key={`current-${card.key}`} className={styles.statCard} style={{ ['--stat-accent' as string]: card.color }}>
-              <span className={styles.statLabel}>{card.label}</span>
-              <strong className={styles.statValue}>{formatTimeHuman(stats[card.key])}</strong>
-            </div>
-          ))}
-        </div>
+        {renderStatCards(stats, 'current')}
       </section>
 
       <section className={styles.section}>
@@ -304,14 +294,7 @@ export const StatsPage: React.FC<StatsPageProps> = ({ onBackToTimers }) => {
           <h3 className={styles.sectionTitle}>Lifetime Totals</h3>
           <span className={styles.mutedText}>Manual reset only</span>
         </div>
-        <div className={styles.cardGrid}>
-          {STAT_CARDS.map((card) => (
-            <div key={`lifetime-${card.key}`} className={styles.statCard} style={{ ['--stat-accent' as string]: card.color }}>
-              <span className={styles.statLabel}>{card.label}</span>
-              <strong className={styles.statValue}>{formatTimeHuman(lifetimeStats[card.key])}</strong>
-            </div>
-          ))}
-        </div>
+        {renderStatCards(lifetimeStats, 'lifetime')}
       </section>
 
       <section className={styles.section}>

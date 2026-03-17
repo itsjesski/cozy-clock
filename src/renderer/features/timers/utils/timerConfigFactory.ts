@@ -36,7 +36,6 @@ function buildTypeSpecificConfig(input: BuildTimerConfigInput): Partial<TimerCon
     return {
       sitDuration: minutesToSeconds(input.sitMinutes),
       standDuration: minutesToSeconds(input.standMinutes),
-      autoLoop: true,
     }
   }
 

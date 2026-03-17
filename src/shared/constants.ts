@@ -3,8 +3,8 @@
  */
 
 // Default timer durations (in seconds)
-export const DEFAULT_SIT_DURATION = 25 * 60 // 25 minutes
-export const DEFAULT_STAND_DURATION = 5 * 60 // 5 minutes
+export const DEFAULT_SIT_DURATION = 30 * 60 // 30 minutes
+export const DEFAULT_STAND_DURATION = 60 * 60 // 1 hour
 
 export const DEFAULT_POMODORO_WORK = 25 * 60 // 25 minutes
 export const DEFAULT_POMODORO_SHORT_BREAK = 5 * 60 // 5 minutes
@@ -18,7 +18,8 @@ export const DEFAULT_GENERIC_DURATION = 10 * 60 // 10 minutes
 export const DEFAULT_INSPIRATION_THRESHOLDS = [75, 50, 25, 10]
 
 // Alert volume
-export const DEFAULT_ALERT_VOLUME = 80
+export const DEFAULT_ALERT_VOLUME = 90
+export const BUILTIN_ALERT_SOUND_SOFT_CHIME = 'builtin://soft-chime'
 
 // Themes
 export const AVAILABLE_THEMES = [

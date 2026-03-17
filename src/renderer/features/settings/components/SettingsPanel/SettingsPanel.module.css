@@ -1,6 +1,7 @@
 .container {
   width: 100%;
   max-width: 440px;
+  height: min(680px, 85vh);
   max-height: 85vh;
   overflow-y: auto;
   background: var(--bg-secondary);
@@ -33,6 +34,32 @@
   margin: 0;
   font-size: 1.1rem;
   color: var(--text-primary);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+
+.tabButton {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabButton:hover {
+  background: var(--bg-interactive);
+}
+
+.tabButtonActive {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 14%, var(--bg-primary));
 }
 
 .field {

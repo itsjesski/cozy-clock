@@ -1,4 +1,3 @@
-import React from 'react'
 import styles from './TimerTile.module.css'
 
 interface TimerActionsProps {
@@ -8,28 +7,26 @@ interface TimerActionsProps {
   onReset: () => void
 }
 
-export const TimerActions: React.FC<TimerActionsProps> = ({
+export function TimerActions({
   playPauseLabel,
   isLoading,
   onPlayPause,
   onReset,
-}) => {
-  return (
-    <div className={styles.controls}>
-      <button
-        className={`${styles.controlButton} ${styles.playPauseBtn}`}
-        onClick={onPlayPause}
-        disabled={isLoading}
-      >
-        {playPauseLabel}
-      </button>
-      <button
-        className={`${styles.controlButton} ${styles.resetBtn}`}
-        onClick={onReset}
-        disabled={isLoading}
-      >
-        Reset
-      </button>
-    </div>
-  )
+}: TimerActionsProps) {
+  return <div className={styles.controls}>
+    <button
+      className={`${styles.controlButton} ${styles.playPauseBtn}`}
+      onClick={onPlayPause}
+      disabled={isLoading}
+    >
+      {playPauseLabel}
+    </button>
+    <button
+      className={`${styles.controlButton} ${styles.resetBtn}`}
+      onClick={onReset}
+      disabled={isLoading}
+    >
+      Reset
+    </button>
+  </div>
 }

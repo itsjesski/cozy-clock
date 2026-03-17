@@ -50,11 +50,20 @@ export function generateId(): string {
 }
 
 /**
+ * Get a local calendar date as YYYY-MM-DD string
+ */
+export function getDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/**
  * Get today's date as YYYY-MM-DD string
  */
 export function getTodayDate(): string {
-  const now = new Date()
-  return now.toISOString().split('T')[0]
+  return getDateKey(new Date())
 }
 
 /**

@@ -3,22 +3,14 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { generateId } from '@shared/utils'
-import {
-  DEFAULT_GENERIC_DURATION,
-  DEFAULT_SIT_DURATION,
-  DEFAULT_STAND_DURATION,
-  DEFAULT_POMODORO_WORK,
-  DEFAULT_POMODORO_SHORT_BREAK,
-  DEFAULT_POMODORO_LONG_BREAK,
-  DEFAULT_POMODORO_ROUNDS_BEFORE_LONG,
-} from '@shared/constants'
-import { buildTimerConfig } from '../../utils/timerConfigFactory'
 import { getNextCircularIndex, getPreviousCircularIndex } from '../../utils/carousel'
 import { resolveDefaultModeByTimerType } from '../../utils/timerMode'
-import { useIpcSubscription } from '../../../../hooks/useIpcSubscription'
+import { useCreateTimerForm } from '../../hooks/useCreateTimerForm'
+import { useUpdaterModal } from '../../hooks/useUpdaterModal'
 import { useSettingsUpdater } from '../../../settings/hooks/useSettingsUpdater'
 import { TimerTile } from '../TimerTile/TimerTile'
+import { CreateTimerModal } from './CreateTimerModal'
+import { UpdaterModal } from './UpdaterModal'
 import { SettingsPanel } from '../../../settings/components/SettingsPanel/SettingsPanel'
 import { useGlobalStore } from '../../../../store/globalStore'
 import type { TimerConfig } from '../../../../../types'
@@ -33,40 +25,34 @@ export const Dashboard: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false)
   const [isCreateTimerOpen, setIsCreateTimerOpen] = useState(false)
-  const [isUpdateAvailable, setIsUpdateAvailable] = useState(false)
-  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
-  const [isDownloadingUpdate, setIsDownloadingUpdate] = useState(false)
-  const [isUpdateReady, setIsUpdateReady] = useState(false)
-  const [updateProgress, setUpdateProgress] = useState(0)
-  const [updateStatus, setUpdateStatus] = useState('Preparing download...')
-  const [updateError, setUpdateError] = useState<string | null>(null)
 
-  const resetUpdateModalState = () => {
-    setUpdateError(null)
-    setIsUpdateReady(false)
-    setUpdateProgress(0)
-    setUpdateStatus('Preparing download...')
-    setIsDownloadingUpdate(true)
-  }
-
-  const [newTimerType, setNewTimerType] = useState<TimerType>('generic')
-  const [newTimerLabel, setNewTimerLabel] = useState('')
-  const [newTimerMode, setNewTimerMode] = useState<TimerMode>('countdown')
-  const [newGenericMinutes, setNewGenericMinutes] = useState(Math.round(DEFAULT_GENERIC_DURATION / 60))
-  const [newSitMinutes, setNewSitMinutes] = useState(Math.round(DEFAULT_SIT_DURATION / 60))
-  const [newStandMinutes, setNewStandMinutes] = useState(Math.round(DEFAULT_STAND_DURATION / 60))
-  const [newWorkMinutes, setNewWorkMinutes] = useState(Math.round(DEFAULT_POMODORO_WORK / 60))
-  const [newShortBreakMinutes, setNewShortBreakMinutes] = useState(
-    Math.round(DEFAULT_POMODORO_SHORT_BREAK / 60),
-  )
-  const [newLongBreakMinutes, setNewLongBreakMinutes] = useState(
-    Math.round(DEFAULT_POMODORO_LONG_BREAK / 60),
-  )
-  const [newPomodoroRounds, setNewPomodoroRounds] = useState(DEFAULT_POMODORO_ROUNDS_BEFORE_LONG)
+  const {
+    isUpdateAvailable,
+    isUpdateModalOpen,
+    isDownloadingUpdate,
+    isUpdateReady,
+    updateProgress,
+    updateStatus,
+    updateError,
+    handleOpenUpdateModal,
+    handleInstallUpdate,
+    closeUpdateModal,
+  } = useUpdaterModal()
 
   const getDefaultModeByType = (type: TimerType): TimerMode => {
     return resolveDefaultModeByTimerType(type, globalSettings)
   }
+
+  const {
+    form,
+    setFormField,
+    handleCreateTimer,
+  } = useCreateTimerForm({
+    timers,
+    setTimers,
+    getDefaultModeByType,
+    setIsCreateTimerOpen,
+  })
 
   useEffect(() => {
     const loadTimers = async () => {
@@ -94,56 +80,6 @@ export const Dashboard: React.FC = () => {
     }
   }, [compactTimerIndex, timers.length])
 
-  useIpcSubscription(() => {
-    const unsubUpdateAvailable = window.electronAPI?.onUpdateAvailable(() => {
-      setIsUpdateAvailable(true)
-    })
-
-    const unsubUpdateProgress = window.electronAPI?.onUpdateProgress((data: { percent?: number }) => {
-      const percent = Math.max(0, Math.min(100, Math.round(data?.percent || 0)))
-      setUpdateProgress(percent)
-      setUpdateStatus(`Downloading... ${percent}%`)
-      setIsDownloadingUpdate(percent < 100)
-    })
-
-    const unsubUpdateReady = window.electronAPI?.onUpdateReady(() => {
-      setUpdateProgress(100)
-      setUpdateStatus('Download complete!')
-      setIsDownloadingUpdate(false)
-      setIsUpdateReady(true)
-    })
-
-    const unsubUpdateError = window.electronAPI?.onUpdateError((data: { message?: string }) => {
-      setUpdateError(data?.message || 'Updater failed.')
-      setIsDownloadingUpdate(false)
-    })
-
-    return () => {
-      unsubUpdateAvailable?.()
-      unsubUpdateProgress?.()
-      unsubUpdateReady?.()
-      unsubUpdateError?.()
-    }
-  }, [])
-
-  const handleOpenUpdateModal = async () => {
-    setIsUpdateModalOpen(true)
-    resetUpdateModalState()
-
-    const result = await window.electronAPI?.startUpdateDownload()
-    if (!result?.success) {
-      setIsDownloadingUpdate(false)
-      setUpdateError(result?.error || 'Failed to start update download.')
-    }
-  }
-
-  const handleInstallUpdate = async () => {
-    const result = await window.electronAPI?.installDownloadedUpdate()
-    if (!result?.success) {
-      setUpdateError(result?.error || 'Failed to install update.')
-    }
-  }
-
   const updateTimer = (id: string, updates: Partial<TimerConfig>) => {
     setTimers((prev) =>
       prev.map((timer) => (timer.id === id ? { ...timer, ...updates } : timer)),
@@ -160,39 +96,6 @@ export const Dashboard: React.FC = () => {
     window.electronAPI?.deleteTimer(id).catch(() => {
       // Ignore transient IPC failures during hot reload; local UI stays updated
     })
-  }
-
-  const handleCreateTimer = async () => {
-    const nextIndex = timers.length + 1
-    const timerId = generateId()
-    const timerConfig = buildTimerConfig({
-      timerId,
-      timerType: newTimerType,
-      timerMode: newTimerMode,
-      defaultModeByType: getDefaultModeByType,
-      timerLabel: newTimerLabel,
-      timerIndex: nextIndex,
-      genericMinutes: newGenericMinutes,
-      sitMinutes: newSitMinutes,
-      standMinutes: newStandMinutes,
-      workMinutes: newWorkMinutes,
-      shortBreakMinutes: newShortBreakMinutes,
-      longBreakMinutes: newLongBreakMinutes,
-      pomodoroRounds: newPomodoroRounds,
-    })
-
-    setTimers((prev) => [...prev, timerConfig])
-    setIsCreateTimerOpen(false)
-    setNewTimerLabel('')
-
-    try {
-      const result = await window.electronAPI?.createTimer(timerConfig)
-      if (result && !result.success) {
-        console.warn('Create timer request was not accepted by main process.')
-      }
-    } catch {
-      // Keep optimistic UI behavior; this can happen briefly during hot reload
-    }
   }
 
   const goToPreviousCompactTimer = () => {
@@ -219,6 +122,7 @@ export const Dashboard: React.FC = () => {
       duration={timer.duration}
       sitDuration={timer.sitDuration}
       standDuration={timer.standDuration}
+      autoAdvanceStages={timer.autoAdvanceStages}
       autoLoop={timer.autoLoop}
       continueFromLastTime={timer.continueFromLastTime}
       continueWhileAppClosed={timer.continueWhileAppClosed}
@@ -226,7 +130,7 @@ export const Dashboard: React.FC = () => {
       shortBreakDuration={timer.shortBreakDuration}
       longBreakDuration={timer.longBreakDuration}
       roundsBeforeLongBreak={timer.roundsBeforeLongBreak}
-      accentColor={timer.accentColor}
+      borderColor={timer.borderColor}
       alertVolume={timer.alertVolume}
       alertCues={timer.alertCues}
       useGlobalAlertCues={timer.useGlobalAlertCues}
@@ -321,36 +225,16 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {isUpdateModalOpen && (
-        <div className={styles.settingsOverlay} onClick={() => setIsUpdateModalOpen(false)}>
-          <div className={styles.updateModal} role="dialog" aria-modal="true" aria-label="Updater" onClick={(event) => event.stopPropagation()}>
-            <h3 className={styles.updateModalTitle}>
-              {isUpdateReady ? 'Update Ready' : 'Downloading Update'}
-            </h3>
-            <div className={styles.progressContainer}>
-              <div className={styles.progressBar} style={{ width: `${updateProgress}%` }}>
-                {updateProgress}%
-              </div>
-            </div>
-            <p className={styles.updateStatus}>{updateStatus}</p>
-            {updateError && <p className={styles.updateError}>{updateError}</p>}
-            <div className={styles.updateActions}>
-              {isUpdateReady ? (
-                <button className={styles.installButton} onClick={handleInstallUpdate}>
-                  Install and Restart
-                </button>
-              ) : (
-                <button className={styles.settingsButton} disabled={isDownloadingUpdate}>
-                  {isDownloadingUpdate ? 'Downloading...' : 'Waiting...'}
-                </button>
-              )}
-              <button className={styles.settingsButton} onClick={() => setIsUpdateModalOpen(false)}>
-                {isUpdateReady ? 'Later' : 'Close'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UpdaterModal
+        isOpen={isUpdateModalOpen}
+        isUpdateReady={isUpdateReady}
+        updateProgress={updateProgress}
+        updateStatus={updateStatus}
+        updateError={updateError}
+        isDownloadingUpdate={isDownloadingUpdate}
+        onInstall={handleInstallUpdate}
+        onClose={closeUpdateModal}
+      />
 
       <main className={styles.main}>
         {globalSettings.compactMode ? (
@@ -416,134 +300,17 @@ export const Dashboard: React.FC = () => {
         )}
       </main>
 
-      {isCreateTimerOpen && (
-        <div className={`${styles.settingsOverlay} ${styles.lockedOverlay}`}>
-          <div className={styles.updateModal} role="dialog" aria-modal="true" aria-label="Create timer">
-            <h3 className={styles.updateModalTitle}>Create Timer</h3>
+      <footer className={styles.footer} aria-label="App footer">
+        <span className={styles.footerText}>Built with ❤️ by -Jesski-</span>
+      </footer>
 
-            <label className={styles.modalField}>
-              Timer Type
-              <select aria-label="Timer type" value={newTimerType} onChange={(event) => setNewTimerType(event.target.value as TimerType)}>
-                <option value="generic">Generic</option>
-                <option value="sit-stand">Sit Stand</option>
-                <option value="pomodoro">Pomodoro</option>
-              </select>
-            </label>
-
-            <label className={styles.modalField}>
-              Label
-              <input
-                type="text"
-                aria-label="Timer label"
-                value={newTimerLabel}
-                onChange={(event) => setNewTimerLabel(event.target.value)}
-                placeholder="Optional custom label"
-              />
-            </label>
-
-            {newTimerType === 'generic' && (
-              <>
-                <label className={styles.modalField}>
-                  Mode
-                  <select aria-label="Generic timer mode" value={newTimerMode} onChange={(event) => setNewTimerMode(event.target.value as TimerMode)}>
-                    <option value="countdown">Countdown</option>
-                    <option value="countup">Count Up</option>
-                  </select>
-                </label>
-                <label className={styles.modalField}>
-                  Duration (minutes)
-                  <input
-                    type="number"
-                    aria-label="Generic timer minutes"
-                    min={1}
-                    value={newGenericMinutes}
-                    onChange={(event) => setNewGenericMinutes(Number(event.target.value))}
-                  />
-                </label>
-              </>
-            )}
-
-            {newTimerType === 'sit-stand' && (
-              <>
-                <label className={styles.modalField}>
-                  Sit Duration (minutes)
-                  <input
-                    type="number"
-                    aria-label="Sit duration minutes"
-                    min={1}
-                    value={newSitMinutes}
-                    onChange={(event) => setNewSitMinutes(Number(event.target.value))}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  Stand Duration (minutes)
-                  <input
-                    type="number"
-                    aria-label="Stand duration minutes"
-                    min={1}
-                    value={newStandMinutes}
-                    onChange={(event) => setNewStandMinutes(Number(event.target.value))}
-                  />
-                </label>
-              </>
-            )}
-
-            {newTimerType === 'pomodoro' && (
-              <>
-                <label className={styles.modalField}>
-                  Work (minutes)
-                  <input
-                    type="number"
-                    aria-label="Pomodoro work minutes"
-                    min={1}
-                    value={newWorkMinutes}
-                    onChange={(event) => setNewWorkMinutes(Number(event.target.value))}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  Short Break (minutes)
-                  <input
-                    type="number"
-                    aria-label="Pomodoro short break minutes"
-                    min={1}
-                    value={newShortBreakMinutes}
-                    onChange={(event) => setNewShortBreakMinutes(Number(event.target.value))}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  Long Break (minutes)
-                  <input
-                    type="number"
-                    aria-label="Pomodoro long break minutes"
-                    min={1}
-                    value={newLongBreakMinutes}
-                    onChange={(event) => setNewLongBreakMinutes(Number(event.target.value))}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  Rounds Before Long Break
-                  <input
-                    type="number"
-                    aria-label="Pomodoro rounds before long break"
-                    min={1}
-                    value={newPomodoroRounds}
-                    onChange={(event) => setNewPomodoroRounds(Number(event.target.value))}
-                  />
-                </label>
-              </>
-            )}
-
-            <div className={styles.updateActions}>
-              <button className={styles.settingsButton} onClick={() => setIsCreateTimerOpen(false)}>
-                Cancel
-              </button>
-              <button className={styles.installButton} onClick={handleCreateTimer}>
-                Add Timer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <CreateTimerModal
+        isOpen={isCreateTimerOpen}
+        form={form}
+        setFormField={setFormField}
+        onCancel={() => setIsCreateTimerOpen(false)}
+        onCreate={handleCreateTimer}
+      />
     </div>
   )
 }

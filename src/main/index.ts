@@ -5,6 +5,7 @@
 import { app, BrowserWindow, screen, ipcMain } from 'electron'
 import path from 'path'
 import net from 'net'
+import http from 'http'
 import isDev from 'electron-is-dev'
 import { initializeUpdater } from './services/updater'
 import { registerAllHandlers } from './ipcHandlers'
@@ -60,6 +61,35 @@ function isPortInUse(port: number): Promise<boolean> {
       resolve(false)
     })
     server.listen(port, '127.0.0.1')
+  })
+}
+
+function isViteDevServerAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const expectedToken = process.env.COZY_CLOCK_DEV_SERVER_TOKEN?.trim()
+    if (!expectedToken) {
+      resolve(false)
+      return
+    }
+
+    const request = http.get(`http://127.0.0.1:${port}/@vite/client`, (response) => {
+      const markerHeader = response.headers['x-cozy-clock-dev-server']
+      const tokenHeader = response.headers['x-cozy-clock-dev-server-token']
+      const marker = Array.isArray(markerHeader) ? markerHeader[0] : markerHeader
+      const token = Array.isArray(tokenHeader) ? tokenHeader[0] : tokenHeader
+      const isOk = response.statusCode === 200 && marker === 'cozy-clock' && token === expectedToken
+      response.resume()
+      resolve(isOk)
+    })
+
+    request.on('error', () => {
+      resolve(false)
+    })
+
+    request.setTimeout(1000, () => {
+      request.destroy()
+      resolve(false)
+    })
   })
 }
 
@@ -196,7 +226,7 @@ app.on('ready', async () => {
   // Check the configured dev server port before opening the main window.
   if (isDev) {
     const serverPort = getServerPort()
-    if (await isPortInUse(serverPort)) {
+    if ((await isPortInUse(serverPort)) && !(await isViteDevServerAvailable(serverPort))) {
       logInfo(`Port ${serverPort} is in use, showing port conflict dialog`)
       await showPortConflictDialog(serverPort)
       return

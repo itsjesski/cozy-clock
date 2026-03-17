@@ -6,7 +6,7 @@
   "main": "dist-electron/main/main/index.js",
   "homepage": "./",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev": "node scripts/dev-electron.js",
     "dev:vite": "vite",
     "dev:electron": "node scripts/dev-electron.js",
     "build": "npm run build:vite && npm run build:electron",
@@ -16,7 +16,10 @@
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
     "type-check": "tsc --noEmit",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "release:patch": "node scripts/release.js patch",
+    "release:minor": "node scripts/release.js minor",
+    "release:major": "node scripts/release.js major"
   },
   "dependencies": {
     "electron-is-dev": "^3.0.1",

@@ -1,12 +1,12 @@
-import type { TimerConfig } from '../../../../types'
+import type { TimerConfig } from '../types'
 import {
   DEFAULT_GENERIC_DURATION,
+  DEFAULT_POMODORO_LONG_BREAK,
+  DEFAULT_POMODORO_SHORT_BREAK,
+  DEFAULT_POMODORO_WORK,
   DEFAULT_SIT_DURATION,
   DEFAULT_STAND_DURATION,
-  DEFAULT_POMODORO_WORK,
-  DEFAULT_POMODORO_SHORT_BREAK,
-  DEFAULT_POMODORO_LONG_BREAK,
-} from '@shared/constants'
+} from './constants'
 
 export function getResolvedPhaseLabel(
   type: TimerConfig['type'],
@@ -14,7 +14,11 @@ export function getResolvedPhaseLabel(
   currentPhaseLabel?: string,
 ): string {
   if (type === 'sit-stand') {
-    return currentPhaseLabel === 'Standing' ? 'Standing' : 'Sitting'
+    if (currentPhaseLabel === 'Sitting' || currentPhaseLabel === 'Standing') {
+      return currentPhaseLabel
+    }
+
+    return 'Standing'
   }
 
   if (type === 'pomodoro') {
@@ -55,7 +59,9 @@ export function getPhaseTotalSeconds(
 
   if (config.type === 'pomodoro') {
     if (resolvedPhaseLabel === 'Work') return config.workDuration ?? DEFAULT_POMODORO_WORK
-    if (resolvedPhaseLabel === 'Long Break') return config.longBreakDuration ?? DEFAULT_POMODORO_LONG_BREAK
+    if (resolvedPhaseLabel === 'Long Break') {
+      return config.longBreakDuration ?? DEFAULT_POMODORO_LONG_BREAK
+    }
     return config.shortBreakDuration ?? DEFAULT_POMODORO_SHORT_BREAK
   }
 

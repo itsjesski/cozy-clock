@@ -4,7 +4,7 @@
 
 .tile {
   background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--tile-border, var(--border-color));
   border-radius: 12px;
   padding: 1.5rem;
   display: flex;
@@ -42,7 +42,6 @@
 
 .tile:hover {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  border-color: var(--tile-accent, var(--accent-primary));
 }
 
 .header {
@@ -190,6 +189,10 @@
   transform: rotateY(180deg);
 }
 
+.faceFront {
+  gap: 0.7rem;
+}
+
 .statsPanel {
   flex: 1;
   border: 1px solid var(--border-color);
@@ -239,8 +242,8 @@
 }
 
 .statsToggleButtonActive {
-  border-color: var(--tile-accent, var(--accent-primary));
-  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 16%, var(--bg-primary));
+  border-color: var(--tile-border, var(--accent-primary));
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-primary));
   color: var(--text-primary);
 }
 
@@ -310,7 +313,7 @@
   background: var(--bg-primary);
   border-radius: 8px;
   border: 1px solid var(--border-color);
-  min-height: 160px;
+  min-height: 130px;
   padding: 1rem;
   animation: slideIn 0.3s ease-out;
 }
@@ -324,6 +327,15 @@
   justify-content: center;
 }
 
+.phaseStatus {
+  margin: -0.2rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-height: 1.2rem;
+}
+
 .controlButton {
   flex: 1;
   min-width: 0;
@@ -334,7 +346,7 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s;
-  background: var(--tile-accent, var(--accent-primary));
+  background: var(--accent-primary);
   color: white;
   font-weight: 500;
   display: flex;
@@ -343,7 +355,7 @@
 }
 
 .controlButton:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 85%, black);
+  background: color-mix(in srgb, var(--accent-primary) 85%, black);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -359,11 +371,11 @@
 }
 
 .playPauseBtn {
-  background: var(--tile-accent, var(--accent-primary));
+  background: var(--accent-primary);
 }
 
 .resetBtn {
-  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 88%, black);
+  background: color-mix(in srgb, var(--accent-primary) 88%, black);
 }
 
 .settingsOverlay {
@@ -380,6 +392,7 @@
 .settingsModal {
   width: 100%;
   max-width: 360px;
+  height: min(640px, 85vh);
   max-height: 85vh;
   overflow-y: auto;
   background: var(--bg-secondary);
@@ -446,7 +459,7 @@
 
 .settingsTabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 0.5rem;
 }
 
@@ -467,8 +480,8 @@
 }
 
 .settingsTabButtonActive {
-  border-color: var(--tile-accent, var(--accent-primary));
-  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 16%, var(--bg-primary));
+  border-color: var(--tile-border, var(--accent-primary));
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-primary));
 }
 
 .settingsField {
@@ -543,7 +556,7 @@
   margin: 0;
   border-radius: 999px;
   padding: 0.35rem 0.6rem;
-  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 10%, var(--bg-primary));
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-primary));
   color: var(--text-secondary);
   font-size: 0.74rem;
   line-height: 1.35;
@@ -700,7 +713,7 @@
 }
 
 .running {
-  border-color: var(--tile-accent, var(--accent-primary));
+  border-color: var(--tile-border, var(--accent-primary));
   background: var(--bg-interactive);
 }
 

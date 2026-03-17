@@ -8,11 +8,18 @@ import type {
   TimerStatsHistoryEntry,
   TimerPeriodStats,
 } from '../../types'
-import { getTodayDate } from '../../shared/utils'
+import { getDateKey, getTodayDate } from '../../shared/utils'
 
 const store = new DataStore()
 
 type StatsBucketKey = keyof Omit<GlobalStats, 'lastResetAt'>
+const STATS_BUCKET_KEYS: StatsBucketKey[] = [
+  'sitTime',
+  'standTime',
+  'pomodoroWorkTime',
+  'pomodoroBreakTime',
+  'genericTimerTime',
+]
 
 function createEmptyTimerBreakdown(): TimerPeriodStats['day'] {
   return {
@@ -122,28 +129,14 @@ function createEmptyHistoryEntry(date: string): StatsHistory {
 }
 
 function mergeStats(base: GlobalStats, updates: Partial<Record<StatsBucketKey, number>>): GlobalStats {
-  return {
-    ...base,
-    sitTime: base.sitTime + (updates.sitTime ?? 0),
-    standTime: base.standTime + (updates.standTime ?? 0),
-    pomodoroWorkTime: base.pomodoroWorkTime + (updates.pomodoroWorkTime ?? 0),
-    pomodoroBreakTime: base.pomodoroBreakTime + (updates.pomodoroBreakTime ?? 0),
-    genericTimerTime: base.genericTimerTime + (updates.genericTimerTime ?? 0),
-  }
+  return applyBucketDeltas(base, updates)
 }
 
 function updateHistory(history: StatsHistory[], date: string, updates: Partial<Record<StatsBucketKey, number>>): StatsHistory[] {
   const nextHistory = [...history]
   const existingIndex = nextHistory.findIndex((entry) => entry.date === date)
   const base = existingIndex >= 0 ? nextHistory[existingIndex] : createEmptyHistoryEntry(date)
-  const nextEntry: StatsHistory = {
-    ...base,
-    sitTime: base.sitTime + (updates.sitTime ?? 0),
-    standTime: base.standTime + (updates.standTime ?? 0),
-    pomodoroWorkTime: base.pomodoroWorkTime + (updates.pomodoroWorkTime ?? 0),
-    pomodoroBreakTime: base.pomodoroBreakTime + (updates.pomodoroBreakTime ?? 0),
-    genericTimerTime: base.genericTimerTime + (updates.genericTimerTime ?? 0),
-  }
+  const nextEntry: StatsHistory = applyBucketDeltas(base, updates)
 
   if (existingIndex >= 0) {
     nextHistory[existingIndex] = nextEntry
@@ -183,13 +176,6 @@ function isAutoResetDue(schedule: string | undefined, lastDate: string | undefin
 function getCompletedCycleIncrement(config: TimerConfig, phaseLabel?: string): Partial<Record<StatsBucketKey, number>> {
   if (config.type === 'sit-stand') {
     const isStanding = phaseLabel === 'Standing'
-    if (isStanding && config.includeStandInStats === false) {
-      return {}
-    }
-    if (!isStanding && config.includeSitInStats === false) {
-      return {}
-    }
-
     return isStanding
       ? { standTime: config.standDuration ?? 5 * 60 }
       : { sitTime: config.sitDuration ?? 25 * 60 }
@@ -197,23 +183,11 @@ function getCompletedCycleIncrement(config: TimerConfig, phaseLabel?: string): P
 
   if (config.type === 'pomodoro') {
     if (phaseLabel === 'Long Break') {
-      if (config.includePomodoroBreakInStats !== true) {
-        return {}
-      }
       return { pomodoroBreakTime: config.longBreakDuration ?? 15 * 60 }
     }
-
     if (phaseLabel === 'Short Break') {
-      if (config.includePomodoroBreakInStats !== true) {
-        return {}
-      }
       return { pomodoroBreakTime: config.shortBreakDuration ?? 5 * 60 }
     }
-
-    if (config.includePomodoroWorkInStats === false) {
-      return {}
-    }
-
     return { pomodoroWorkTime: config.workDuration ?? 25 * 60 }
   }
 
@@ -225,13 +199,7 @@ function getCompletedCycleIncrement(config: TimerConfig, phaseLabel?: string): P
 }
 
 function getIncrementTotalSeconds(increment: Partial<Record<StatsBucketKey, number>>): number {
-  return (
-    (increment.sitTime ?? 0) +
-    (increment.standTime ?? 0) +
-    (increment.pomodoroWorkTime ?? 0) +
-    (increment.pomodoroBreakTime ?? 0) +
-    (increment.genericTimerTime ?? 0)
-  )
+  return sumBucketValues(increment as Record<StatsBucketKey, number>)
 }
 
 function updateTimerHistory(
@@ -250,22 +218,11 @@ function updateTimerHistory(
     existingIndex >= 0
       ? normalizeTimerEntry(nextHistory[existingIndex], timerType)
       : { timerId, date, ...createEmptyTimerBreakdown() }
-
-  const sitTime = base.sitTime + (increment.sitTime ?? 0)
-  const standTime = base.standTime + (increment.standTime ?? 0)
-  const pomodoroWorkTime = base.pomodoroWorkTime + (increment.pomodoroWorkTime ?? 0)
-  const pomodoroBreakTime = base.pomodoroBreakTime + (increment.pomodoroBreakTime ?? 0)
-  const genericTimerTime = base.genericTimerTime + (increment.genericTimerTime ?? 0)
+  const nextBreakdown = applyBucketDeltas(base, increment)
 
   const nextEntry: TimerStatsHistoryEntry = {
-    timerId,
-    date,
-    sitTime,
-    standTime,
-    pomodoroWorkTime,
-    pomodoroBreakTime,
-    genericTimerTime,
-    totalTime: sitTime + standTime + pomodoroWorkTime + pomodoroBreakTime + genericTimerTime,
+    ...nextBreakdown,
+    totalTime: sumBucketValues(nextBreakdown),
   }
 
   if (existingIndex >= 0) {
@@ -275,13 +232,6 @@ function updateTimerHistory(
   }
 
   return nextHistory.sort((a, b) => a.date.localeCompare(b.date))
-}
-
-function getDateKey(date: Date): string {
-  const year = date.getFullYear()
-  const month = `${date.getMonth() + 1}`.padStart(2, '0')
-  const day = `${date.getDate()}`.padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 function getStartOfDay(date: Date): Date {
@@ -309,13 +259,10 @@ function sumTimerEntries(
 ): TimerPeriodStats['day'] {
   return entries.reduce<TimerPeriodStats['day']>((acc, entry) => {
     const normalized = normalizeTimerEntry(entry, timerType)
+    const next = applyBucketDeltas(acc, normalized)
     return {
-      totalTime: acc.totalTime + normalized.totalTime,
-      sitTime: acc.sitTime + normalized.sitTime,
-      standTime: acc.standTime + normalized.standTime,
-      pomodoroWorkTime: acc.pomodoroWorkTime + normalized.pomodoroWorkTime,
-      pomodoroBreakTime: acc.pomodoroBreakTime + normalized.pomodoroBreakTime,
-      genericTimerTime: acc.genericTimerTime + normalized.genericTimerTime,
+      ...next,
+      totalTime: sumBucketValues(next),
     }
   }, createEmptyTimerBreakdown())
 }
@@ -406,29 +353,14 @@ export function recordElapsedTime(
 
   if (config.type === 'sit-stand') {
     const isStanding = phaseLabel === 'Standing'
-    if (isStanding && config.includeStandInStats === false) {
-      return getStatsOverview()
-    }
-    if (!isStanding && config.includeSitInStats === false) {
-      return getStatsOverview()
-    }
-
     increment = isStanding
       ? { standTime: seconds }
       : { sitTime: seconds }
   } else if (config.type === 'pomodoro') {
     const isBreakPhase = phaseLabel === 'Short Break' || phaseLabel === 'Long Break'
-    if (isBreakPhase) {
-      if (config.includePomodoroBreakInStats !== true) {
-        return getStatsOverview()
-      }
-      increment = { pomodoroBreakTime: seconds }
-    } else {
-      if (config.includePomodoroWorkInStats === false) {
-        return getStatsOverview()
-      }
-      increment = { pomodoroWorkTime: seconds }
-    }
+    increment = isBreakPhase
+      ? { pomodoroBreakTime: seconds }
+      : { pomodoroWorkTime: seconds }
   } else {
     increment = { genericTimerTime: seconds }
   }
@@ -481,14 +413,16 @@ export function removeTimerStats(timerId: string): {
     }
   }, createEmptyTimerBreakdown())
 
-  const subtractStats = (base: GlobalStats): GlobalStats => ({
-    ...base,
-    sitTime: Math.max(0, base.sitTime - totalsToSubtract.sitTime),
-    standTime: Math.max(0, base.standTime - totalsToSubtract.standTime),
-    pomodoroWorkTime: Math.max(0, base.pomodoroWorkTime - totalsToSubtract.pomodoroWorkTime),
-    pomodoroBreakTime: Math.max(0, base.pomodoroBreakTime - totalsToSubtract.pomodoroBreakTime),
-    genericTimerTime: Math.max(0, base.genericTimerTime - totalsToSubtract.genericTimerTime),
-  })
+  const negativeTotals: Partial<Record<StatsBucketKey, number>> = {
+    sitTime: -totalsToSubtract.sitTime,
+    standTime: -totalsToSubtract.standTime,
+    pomodoroWorkTime: -totalsToSubtract.pomodoroWorkTime,
+    pomodoroBreakTime: -totalsToSubtract.pomodoroBreakTime,
+    genericTimerTime: -totalsToSubtract.genericTimerTime,
+  }
+
+  const subtractStats = (base: GlobalStats): GlobalStats =>
+    applyBucketDeltas(base, negativeTotals, true)
 
   const nextStats = subtractStats(store.getStats())
   const nextLifetime = subtractStats(store.getLifetimeStats())
@@ -507,14 +441,13 @@ export function removeTimerStats(timerId: string): {
         }
       }, createEmptyTimerBreakdown())
 
-    return {
-      ...entry,
-      sitTime: Math.max(0, entry.sitTime - perDateRemoved.sitTime),
-      standTime: Math.max(0, entry.standTime - perDateRemoved.standTime),
-      pomodoroWorkTime: Math.max(0, entry.pomodoroWorkTime - perDateRemoved.pomodoroWorkTime),
-      pomodoroBreakTime: Math.max(0, entry.pomodoroBreakTime - perDateRemoved.pomodoroBreakTime),
-      genericTimerTime: Math.max(0, entry.genericTimerTime - perDateRemoved.genericTimerTime),
-    }
+    return applyBucketDeltas(entry, {
+      sitTime: -perDateRemoved.sitTime,
+      standTime: -perDateRemoved.standTime,
+      pomodoroWorkTime: -perDateRemoved.pomodoroWorkTime,
+      pomodoroBreakTime: -perDateRemoved.pomodoroBreakTime,
+      genericTimerTime: -perDateRemoved.genericTimerTime,
+    }, true)
   }).filter((entry) =>
     entry.sitTime > 0 ||
     entry.standTime > 0 ||
@@ -628,4 +561,23 @@ export function exportAllTimerStatsCsv(): string {
   ]
 
   return rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+}
+
+function sumBucketValues(values: Record<StatsBucketKey, number>): number {
+  return STATS_BUCKET_KEYS.reduce((total, key) => total + (values[key] ?? 0), 0)
+}
+
+function applyBucketDeltas<T extends Record<StatsBucketKey, number>>(
+  base: T,
+  updates: Partial<Record<StatsBucketKey, number>>,
+  clampAtZero = false,
+): T {
+  const next = { ...base }
+
+  STATS_BUCKET_KEYS.forEach((key) => {
+    const value = base[key] + (updates[key] ?? 0)
+    next[key] = clampAtZero ? Math.max(0, value) : value
+  })
+
+  return next
 }

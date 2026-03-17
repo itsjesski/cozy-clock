@@ -8,6 +8,8 @@ import DataStore from '../store'
 import { createTimer } from '../timers/factory'
 import { getStatsOverview, recordElapsedTime, removeTimerStats } from './statsService'
 import * as ipc from '../../shared/ipc'
+import { DEFAULT_ALERT_VOLUME } from '../../shared/constants'
+import { getPhaseTotalSeconds, getResolvedPhaseLabel } from '../../shared/timerPhase'
 import type { TimerState, TimerConfig, AlertCue, MascotAnimationCue } from '../../types'
 import type { AppSettings } from '../../types'
 import type { BaseTimer } from '../timers/BaseTimer'
@@ -30,6 +32,22 @@ const STATE_PERSIST_INTERVAL_MS = 1000
 const RENDER_TICK_INTERVAL_MS = 250
 const SETTINGS_CACHE_TTL_MS = 1000
 
+function getWholeElapsedSeconds(value: number | undefined): number {
+  return Math.max(0, Math.floor(value || 0))
+}
+
+function clearThresholdTracking(id: string): void {
+  firedAlertThresholds.delete(id)
+  firedMascotThresholds.delete(id)
+  lastRemainingPercent.delete(id)
+}
+
+function stopEngineIfNoRunningTimers(): void {
+  if (Array.from(activeTimers.values()).every((timer) => timer.state.phase !== 'running')) {
+    stopTimerEngine()
+  }
+}
+
 function getCachedSettings(): AppSettings {
   const now = Date.now()
   if (!settingsCache || now - settingsCacheAt > SETTINGS_CACHE_TTL_MS) {
@@ -51,40 +69,6 @@ function getResolvedContinuity(config: TimerConfig): {
     continueWhileAppClosed:
       config.continueWhileAppClosed ?? settings.defaultContinueWhileAppClosed ?? false,
   }
-}
-
-function getResolvedPhaseLabel(config: TimerConfig, phaseLabel?: string): string {
-  if (config.type === 'sit-stand') {
-    return phaseLabel === 'Standing' ? 'Standing' : 'Sitting'
-  }
-
-  if (config.type === 'pomodoro') {
-    if (phaseLabel === 'Short Break' || phaseLabel === 'Long Break') {
-      return phaseLabel
-    }
-
-    return 'Work'
-  }
-
-  return config.mode === 'countup' ? 'Counting Up' : 'Countdown'
-}
-
-function getPhaseTotalSecondsFromConfig(config: TimerConfig, phaseLabel?: string): number {
-  const resolvedPhaseLabel = getResolvedPhaseLabel(config, phaseLabel)
-
-  if (config.type === 'sit-stand') {
-    return resolvedPhaseLabel === 'Standing'
-      ? (config.standDuration || 5 * 60)
-      : (config.sitDuration || 25 * 60)
-  }
-
-  if (config.type === 'pomodoro') {
-    if (resolvedPhaseLabel === 'Work') return config.workDuration || 25 * 60
-    if (resolvedPhaseLabel === 'Long Break') return config.longBreakDuration || 15 * 60
-    return config.shortBreakDuration || 5 * 60
-  }
-
-  return config.duration || 10 * 60
 }
 
 function isCurrentPhaseComplete(timer: BaseTimer): boolean {
@@ -129,13 +113,17 @@ function didTimingValuesChange(
 }
 
 function buildStateForUpdatedConfig(config: TimerConfig, previousState?: TimerState): TimerState {
-  const phaseLabel = getResolvedPhaseLabel(config, previousState?.currentPhaseLabel)
+  const phaseLabel = getResolvedPhaseLabel(
+    config.type,
+    config.mode,
+    previousState?.currentPhaseLabel,
+  )
 
   return {
     id: config.id,
     phase: previousState?.phase || 'idle',
     timeElapsed: 0,
-    timeRemaining: config.mode === 'countup' ? 0 : getPhaseTotalSecondsFromConfig(config, phaseLabel),
+    timeRemaining: config.mode === 'countup' ? 0 : getPhaseTotalSeconds(config, phaseLabel),
     currentPhaseLabel: phaseLabel,
     lastUpdatedAt: Date.now(),
   }
@@ -165,9 +153,6 @@ function hydrateTimerFromSavedState(timer: BaseTimer, savedState: TimerState): v
   }
 }
 
-/**
- * Start the timer engine
- */
 export function startTimerEngine(): void {
   if (tickInterval) return
 
@@ -177,9 +162,6 @@ export function startTimerEngine(): void {
   }, TICK_INTERVAL)
 }
 
-/**
- * Stop the timer engine
- */
 export function stopTimerEngine(): void {
   if (tickInterval) {
     clearInterval(tickInterval)
@@ -187,9 +169,6 @@ export function stopTimerEngine(): void {
   }
 }
 
-/**
- * Update all running timers
- */
 function updateRunningTimers(): void {
   if (activeTimers.size === 0) return
 
@@ -239,7 +218,7 @@ function updateRunningTimers(): void {
 }
 
 function getCurrentPhaseTotalSeconds(timer: BaseTimer): number {
-  return getPhaseTotalSecondsFromConfig(timer.config, timer.getPhaseLabel())
+  return getPhaseTotalSeconds(timer.config, timer.getPhaseLabel())
 }
 
 function syncAccumulatedStats(timerId: string, timer: BaseTimer): void {
@@ -289,6 +268,7 @@ function emitThresholdAlerts(timerId: string, timer: BaseTimer, mainWindow: Brow
   if (total <= 0 || config.mode === 'countup') return
 
   const remainingPercent = Math.max(0, Math.min(100, (timer.state.timeRemaining / total) * 100))
+  const completedPercent = 100 - remainingPercent
   const previousPercent = lastRemainingPercent.get(timerId)
   const firedSet = firedAlertThresholds.get(timerId) || new Set<number>()
   const mascotFiredSet = firedMascotThresholds.get(timerId) || new Set<number>()
@@ -299,11 +279,11 @@ function emitThresholdAlerts(timerId: string, timer: BaseTimer, mainWindow: Brow
   }
 
   const cues = getEffectiveAlertCues(config)
-  const volume = config.alertVolume ?? getCachedSettings().defaultAlertVolume ?? 80
+  const volume = config.alertVolume ?? getCachedSettings().defaultAlertVolume ?? DEFAULT_ALERT_VOLUME
 
   cues.forEach((cue) => {
     const threshold = cue.thresholdPercent
-    if (remainingPercent <= threshold && !firedSet.has(threshold) && cue.soundPath.trim()) {
+    if (completedPercent >= threshold && !firedSet.has(threshold) && cue.soundPath.trim()) {
       mainWindow.webContents.send(ipc.IPC_TIMER_ALERT, {
         id: timerId,
         event: `percent-${threshold}`,
@@ -317,7 +297,7 @@ function emitThresholdAlerts(timerId: string, timer: BaseTimer, mainWindow: Brow
   const mascotCues = getEffectiveMascotAnimationCues(config)
   mascotCues.forEach((cue) => {
     const threshold = cue.thresholdPercent
-    if (remainingPercent <= threshold && !mascotFiredSet.has(threshold)) {
+    if (completedPercent >= threshold && !mascotFiredSet.has(threshold)) {
       mainWindow.webContents.send(ipc.IPC_MASCOT_ANIMATE, {
         id: timerId,
         thresholdPercent: threshold,
@@ -332,16 +312,13 @@ function emitThresholdAlerts(timerId: string, timer: BaseTimer, mainWindow: Brow
   lastRemainingPercent.set(timerId, remainingPercent)
 }
 
-/**
- * Handle timer completion
- */
 function handleTimerComplete(
   timerId: string,
   timer: BaseTimer,
   mainWindow: BrowserWindow,
 ): void {
   const completion = timer.handleCompletion()
-  lastRecordedElapsedSeconds.set(timerId, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
+  lastRecordedElapsedSeconds.set(timerId, getWholeElapsedSeconds(timer.state.timeElapsed))
 
   if (completion.isComplete) {
     // Timer is fully done
@@ -385,9 +362,6 @@ function handleTimerComplete(
   })
 }
 
-/**
- * Create and load a timer
- */
 export function createAndLoadTimer(config: TimerConfig): BaseTimer {
   const timer = createTimer(config)
   store.addTimer(config)
@@ -395,9 +369,6 @@ export function createAndLoadTimer(config: TimerConfig): BaseTimer {
   return timer
 }
 
-/**
- * Load existing timer from store
- */
 export function loadTimer(config: TimerConfig, savedState?: TimerState): BaseTimer {
   const timer = createTimer(config)
   const continuity = getResolvedContinuity(config)
@@ -415,9 +386,6 @@ function loadTimerFromSavedState(config: TimerConfig, savedState: TimerState): B
   return timer
 }
 
-/**
- * Start a timer
- */
 export function startTimer(id: string): void {
   let timer = activeTimers.get(id)
 
@@ -433,19 +401,14 @@ export function startTimer(id: string): void {
   }
 
   timer.start()
-  lastRecordedElapsedSeconds.set(id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
-  firedAlertThresholds.delete(id)
-  firedMascotThresholds.delete(id)
-  lastRemainingPercent.delete(id)
+  lastRecordedElapsedSeconds.set(id, getWholeElapsedSeconds(timer.state.timeElapsed))
+  clearThresholdTracking(id)
   lastPersistedStateAt.set(id, Date.now())
   lastRendererEmitAt.set(id, 0)
   store.setTimerState(id, timer.getState())
   startTimerEngine()
 }
 
-/**
- * Pause a timer
- */
 export function pauseTimer(id: string): void {
   const timer = activeTimers.get(id)
 
@@ -457,14 +420,9 @@ export function pauseTimer(id: string): void {
     lastRendererEmitAt.delete(id)
   }
 
-  if (Array.from(activeTimers.values()).every((t) => t.state.phase !== 'running')) {
-    stopTimerEngine()
-  }
+  stopEngineIfNoRunningTimers()
 }
 
-/**
- * Resume a timer
- */
 export function resumeTimer(id: string): void {
   let timer = activeTimers.get(id)
 
@@ -480,16 +438,13 @@ export function resumeTimer(id: string): void {
   }
 
   timer.resume()
-  lastRecordedElapsedSeconds.set(id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
+  lastRecordedElapsedSeconds.set(id, getWholeElapsedSeconds(timer.state.timeElapsed))
   lastPersistedStateAt.set(id, Date.now())
   lastRendererEmitAt.set(id, 0)
   store.setTimerState(id, timer.getState())
   startTimerEngine()
 }
 
-/**
- * Reset a timer
- */
 export function resetTimer(id: string): void {
   const timer = activeTimers.get(id)
 
@@ -498,9 +453,7 @@ export function resetTimer(id: string): void {
 
     timer.reset()
     lastRecordedElapsedSeconds.set(id, 0)
-    firedAlertThresholds.delete(id)
-    firedMascotThresholds.delete(id)
-    lastRemainingPercent.delete(id)
+    clearThresholdTracking(id)
     lastPersistedStateAt.set(id, Date.now())
     lastRendererEmitAt.delete(id)
     store.setTimerState(id, timer.getState())
@@ -511,23 +464,16 @@ export function resetTimer(id: string): void {
     })
   }
 
-  if (Array.from(activeTimers.values()).every((t) => t.state.phase !== 'running')) {
-    stopTimerEngine()
-  }
+  stopEngineIfNoRunningTimers()
 }
 
-/**
- * Delete a timer
- */
 export function deleteTimer(id: string): void {
   activeTimers.delete(id)
   const statsOverview = removeTimerStats(id)
   BrowserWindow.getAllWindows().forEach((window) => {
     window.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
   })
-  firedAlertThresholds.delete(id)
-  firedMascotThresholds.delete(id)
-  lastRemainingPercent.delete(id)
+  clearThresholdTracking(id)
   lastPersistedStateAt.delete(id)
   lastRendererEmitAt.delete(id)
   lastRecordedElapsedSeconds.delete(id)
@@ -567,9 +513,6 @@ export function updateTimerConfig(id: string, updates: Partial<TimerConfig>): vo
   }
 }
 
-/**
- * Initialize timers on app startup (for continuity)
- */
 export function initializeTimersFromStore(): void {
   const timerConfigs = store.getTimers()
 
@@ -600,7 +543,7 @@ export function initializeTimersFromStore(): void {
       }
 
       activeTimers.set(config.id, timer)
-      lastRecordedElapsedSeconds.set(config.id, Math.max(0, Math.floor(timer.state.timeElapsed || 0)))
+      lastRecordedElapsedSeconds.set(config.id, getWholeElapsedSeconds(timer.state.timeElapsed))
       lastPersistedStateAt.set(config.id, Date.now())
       lastRendererEmitAt.set(config.id, 0)
     }
@@ -626,9 +569,6 @@ export function getStoredTimerStatesForConfiguredTimers(): Record<string, TimerS
   return states
 }
 
-/**
- * Get all active timer states
- */
 export function getAllTimerStates(): Record<string, TimerState> {
   const states: Record<string, TimerState> = {}
 
@@ -639,14 +579,15 @@ export function getAllTimerStates(): Record<string, TimerState> {
   return states
 }
 
-/**
- * Get a specific timer state
- */
 export function getTimerState(id: string): TimerState | null {
   const timer = activeTimers.get(id)
   if (timer) {
     return timer.getState()
   }
 
-  return store.getTimerState(id) || null
+  const stored = store.getTimerState(id)
+  if (!stored) return null
+  // If the stored phase is 'running' but the engine isn't tracking this timer,
+  // the timer is not actually running — normalize to 'paused'.
+  return stored.phase === 'running' ? { ...stored, phase: 'paused' } : stored
 }

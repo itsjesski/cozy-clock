@@ -38,9 +38,9 @@ export class PomodoroTimer extends BaseTimer {
 
   handleCompletion(): { isComplete: boolean; nextPhase?: any } {
     const isLongBreakTime = (this.completedRounds + 1) % this.roundsBeforeLongBreak === 0
+    const shouldAutoAdvance = this.config.autoAdvanceStages ?? this.config.autoLoop ?? true
 
     if (this.currentPhase === 'work') {
-      // Transition to break
       if (isLongBreakTime) {
         this.currentPhase = 'long-break'
         this.state.timeRemaining = this.config.mode === 'countup'
@@ -53,20 +53,19 @@ export class PomodoroTimer extends BaseTimer {
           : (this.config.shortBreakDuration || 5 * 60)
       }
       this.completedRounds++
-      this.state.phase = 'paused'
+      this.state.phase = shouldAutoAdvance ? 'running' : 'paused'
       this.state.timeElapsed = 0
       this.state.currentPhaseLabel = this.getPhaseLabel()
       return { isComplete: false, nextPhase: this.state }
-    } else {
-      // Break complete, back to work
-      this.currentPhase = 'work'
-      this.state.timeRemaining = this.config.mode === 'countup'
-        ? 0
-        : (this.config.workDuration || 25 * 60)
-      this.state.phase = 'paused'
-      this.state.timeElapsed = 0
-      this.state.currentPhaseLabel = 'Work'
-      return { isComplete: false, nextPhase: this.state }
     }
+
+    this.currentPhase = 'work'
+    this.state.timeRemaining = this.config.mode === 'countup'
+      ? 0
+      : (this.config.workDuration || 25 * 60)
+    this.state.phase = shouldAutoAdvance ? 'running' : 'paused'
+    this.state.timeElapsed = 0
+    this.state.currentPhaseLabel = 'Work'
+    return { isComplete: false, nextPhase: this.state }
   }
 }

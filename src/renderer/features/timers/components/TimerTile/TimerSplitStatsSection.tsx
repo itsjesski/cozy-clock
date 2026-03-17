@@ -1,4 +1,3 @@
-import React from 'react'
 import type { TimerPeriodStats } from '../../../../../types'
 import { formatTimeHuman } from '@shared/utils'
 import styles from './TimerTile.module.css'
@@ -15,13 +14,13 @@ interface TimerSplitStatsSectionProps {
   getPeriodValueForView: (period: keyof TimerPeriodStats, view: SplitStatsView) => number
 }
 
-export const TimerSplitStatsSection: React.FC<TimerSplitStatsSectionProps> = ({
+export function TimerSplitStatsSection({
   options,
   splitStatsView,
   setSplitStatsView,
   periods,
   getPeriodValueForView,
-}) => {
+}: TimerSplitStatsSectionProps) {
   return (
     <div className={styles.statsSections}>
       <div className={styles.statsToggleRow}>

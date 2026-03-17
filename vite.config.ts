@@ -38,6 +38,13 @@ function resolveConfiguredServerPort(): number {
 }
 
 const devPort = resolveConfiguredServerPort()
+const devServerToken = process.env.COZY_CLOCK_DEV_SERVER_TOKEN?.trim()
+const devServerHeaders = devServerToken
+  ? {
+      'X-Cozy-Clock-Dev-Server': 'cozy-clock',
+      'X-Cozy-Clock-Dev-Server-Token': devServerToken,
+    }
+  : undefined
 
 export default defineConfig({
   plugins: [react()],
@@ -49,9 +56,11 @@ export default defineConfig({
     },
   },
   server: {
+    host: '127.0.0.1',
     port: devPort,
     strictPort: true,
     hmr: true,
+    headers: devServerHeaders,
   },
   build: {
     target: 'ES2020',

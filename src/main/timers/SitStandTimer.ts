@@ -28,35 +28,27 @@ export class SitStandTimer extends BaseTimer {
   }
 
   handleCompletion(): { isComplete: boolean; nextPhase?: TimerState } {
+    const shouldAutoAdvance = this.config.autoAdvanceStages ?? this.config.autoLoop ?? true
+
     if (this.currentPhase === 'sitting') {
-      // Switch to standing
       this.currentPhase = 'standing'
-      this.state.phase = 'paused' // Auto-pause to let user know phase changed
+      this.state.phase = shouldAutoAdvance ? 'running' : 'paused'
       this.state.timeElapsed = 0
       this.state.timeRemaining = this.config.mode === 'countup'
         ? 0
-        : (this.config.standDuration || 5 * 60) // Default 5 minutes
+        : (this.config.standDuration || 5 * 60)
       this.state.currentPhaseLabel = 'Standing'
-
       return { isComplete: false, nextPhase: this.state }
-    } else {
-      // Sitting cycle complete
-      this.completedCycles++
-
-      if (this.config.autoLoop) {
-        // Reset to sitting and auto-start
-        this.currentPhase = 'sitting'
-        this.state.phase = 'running'
-        this.state.timeElapsed = 0
-        this.state.timeRemaining = this.config.mode === 'countup'
-          ? 0
-          : (this.config.sitDuration || 25 * 60)
-        this.state.currentPhaseLabel = 'Sitting'
-        return { isComplete: false, nextPhase: this.state }
-      } else {
-        // Timer complete
-        return { isComplete: true }
-      }
     }
+
+    this.completedCycles++
+    this.currentPhase = 'sitting'
+    this.state.phase = shouldAutoAdvance ? 'running' : 'paused'
+    this.state.timeElapsed = 0
+    this.state.timeRemaining = this.config.mode === 'countup'
+      ? 0
+      : (this.config.sitDuration || 25 * 60)
+    this.state.currentPhaseLabel = 'Sitting'
+    return { isComplete: false, nextPhase: this.state }
   }
 }

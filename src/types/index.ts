@@ -40,14 +40,15 @@ export interface TimerConfig {
   // Sit/Stand timer
   sitDuration?: number
   standDuration?: number
-  autoLoop?: boolean
+  autoAdvanceStages?: boolean
+  autoLoop?: boolean // legacy alias for autoAdvanceStages
   // Pomodoro timer
   workDuration?: number
   shortBreakDuration?: number
   longBreakDuration?: number
   roundsBeforeLongBreak?: number
   // Display & UX
-  accentColor?: string
+  borderColor?: string
   showInspirationMessages?: boolean
   inspirationThresholds?: number[] // e.g., [75, 50, 25, 10]
   // Sound alerts
@@ -67,11 +68,6 @@ export interface TimerConfig {
   // Continuity
   continueFromLastTime?: boolean
   continueWhileAppClosed?: boolean
-  // Stats options
-  includeSitInStats?: boolean
-  includeStandInStats?: boolean
-  includePomodoroWorkInStats?: boolean
-  includePomodoroBreakInStats?: boolean
 }
 
 export interface TimerState {
@@ -143,6 +139,7 @@ export interface AppSettings {
   minimizeToTray?: boolean
   defaultContinueFromLastTime?: boolean
   defaultContinueWhileAppClosed?: boolean
+  defaultAutoAdvanceStages?: boolean
   mascotImagePath?: string
   mascotSize?: number // 50-200
   mascotScale?: number // 0.3 - 1.2

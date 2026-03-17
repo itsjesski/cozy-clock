@@ -38,15 +38,3 @@ export function createTimerStore(timerId: string): TimerStore {
   timerStores.set(timerId, store)
   return store
 }
-
-export function getTimerStore(timerId: string): TimerStore | undefined {
-  return timerStores.get(timerId)
-}
-
-export function deleteTimerStore(timerId: string): void {
-  timerStores.delete(timerId)
-}
-
-export function getAllTimerStores(): Array<[string, TimerStore]> {
-  return Array.from(timerStores.entries())
-}

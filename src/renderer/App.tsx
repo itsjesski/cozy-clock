@@ -6,7 +6,12 @@ import React, { useEffect } from 'react'
 import { Dashboard } from './features/timers/components/Dashboard/Dashboard'
 import { useGlobalStore } from './store/globalStore'
 import { Howl } from 'howler'
-import { DEFAULT_THEME, LEGACY_THEME_MAP } from '@shared/constants'
+import {
+  BUILTIN_ALERT_SOUND_SOFT_CHIME,
+  DEFAULT_ALERT_VOLUME,
+  DEFAULT_THEME,
+  LEGACY_THEME_MAP,
+} from '@shared/constants'
 import './app.css'
 
 export const App: React.FC = () => {
@@ -69,7 +74,40 @@ export const App: React.FC = () => {
     const onTimerAlert = (data: { soundPath?: string; volume?: number }) => {
       if (!data?.soundPath) return
 
+      const playSoftChime = () => {
+        const audioContext = new AudioContext()
+        const gainNode = audioContext.createGain()
+        const now = audioContext.currentTime
+        const volume = Math.max(0, Math.min(1, (data.volume ?? DEFAULT_ALERT_VOLUME) / 100))
+
+        const playBeep = (startAt: number) => {
+          const oscillator = audioContext.createOscillator()
+          oscillator.type = 'sine'
+          oscillator.frequency.setValueAtTime(523.25, startAt)
+          oscillator.frequency.exponentialRampToValueAtTime(659.25, startAt + 0.16)
+          gainNode.gain.setValueAtTime(0.0001, startAt)
+          gainNode.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.27), startAt + 0.03)
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.24)
+          oscillator.connect(gainNode)
+          oscillator.start(startAt)
+          oscillator.stop(startAt + 0.26)
+        }
+
+        gainNode.connect(audioContext.destination)
+        playBeep(now)
+        playBeep(now + 0.32)
+
+        setTimeout(() => {
+          void audioContext.close()
+        }, 900)
+      }
+
       const playAlertSound = async () => {
+        if (data.soundPath === BUILTIN_ALERT_SOUND_SOFT_CHIME) {
+          playSoftChime()
+          return
+        }
+
         const resolved = await window.electronAPI?.resolveSoundSource(data.soundPath!)
         const source = resolved?.success && resolved.source
           ? resolved.source
@@ -77,7 +115,7 @@ export const App: React.FC = () => {
 
         const sound = new Howl({
           src: [source],
-          volume: Math.max(0, Math.min(1, (data.volume ?? 80) / 100)),
+          volume: Math.max(0, Math.min(1, (data.volume ?? DEFAULT_ALERT_VOLUME) / 100)),
           html5: true,
         })
 

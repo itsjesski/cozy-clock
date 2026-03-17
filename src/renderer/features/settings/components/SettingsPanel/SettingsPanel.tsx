@@ -1,10 +1,11 @@
-/**
- * SettingsPanel component
- */
-
-import React from 'react'
+import { useState, type ChangeEventHandler } from 'react'
 import { generateId } from '@shared/utils'
-import { AVAILABLE_THEMES, THEME_LABELS } from '@shared/constants'
+import {
+  AVAILABLE_THEMES,
+  BUILTIN_ALERT_SOUND_SOFT_CHIME,
+  DEFAULT_ALERT_VOLUME,
+  THEME_LABELS,
+} from '@shared/constants'
 import { fileToDataUrl } from '../../../../utils/fileToDataUrl'
 import { appendItem, removeById, updateById } from '../../utils/listOps'
 import {
@@ -22,11 +23,13 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
+export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
   const settings = useGlobalStore((state) => state.settings)
   const applySettingsUpdate = useSettingsUpdater()
+  const [activeTab, setActiveTab] = useState<'general' | 'alerts' | 'mascot'>('general')
 
   const mascotAnimationTypes: MascotAnimationType[] = ['shake', 'wiggle', 'bounce']
+  const builtInSoftChimeLabel = 'Soft Chime (Built-in)'
 
   const updateGlobalAlertCue = (cueId: string, updates: Partial<AlertCue>) => {
     const next = updateById(settings.defaultAlertCues || [], cueId, updates)
@@ -76,7 +79,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     applySettingsUpdate({ defaultMascotAnimationCues: next })
   }
 
-  const handleMascotUpload: React.ChangeEventHandler<HTMLInputElement> = (event) => {
+  const handleMascotUpload: ChangeEventHandler<HTMLInputElement> = (event) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -85,10 +88,51 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
       .catch((error) => console.error('Error reading mascot file:', error))
   }
 
+  const timerModeFields: Array<{ label: string; key: 'defaultGenericMode' | 'defaultSitStandMode' | 'defaultPomodoroMode'; value: 'countdown' | 'countup' }> = [
+    {
+      label: 'Generic Default Mode',
+      key: 'defaultGenericMode',
+      value: settings.defaultGenericMode ?? 'countdown',
+    },
+    {
+      label: 'Sit/Stand Default Mode',
+      key: 'defaultSitStandMode',
+      value: settings.defaultSitStandMode ?? 'countdown',
+    },
+    {
+      label: 'Pomodoro Default Mode',
+      key: 'defaultPomodoroMode',
+      value: settings.defaultPomodoroMode ?? 'countdown',
+    },
+  ]
+
   return (
     <div className={styles.container}>
       <h2 className={styles.title}>Settings</h2>
 
+      <div className={styles.tabs}>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'general' ? styles.tabButtonActive : ''}`}
+          onClick={() => setActiveTab('general')}
+        >
+          General
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'alerts' ? styles.tabButtonActive : ''}`}
+          onClick={() => setActiveTab('alerts')}
+        >
+          Alerts
+        </button>
+        <button
+          className={`${styles.tabButton} ${activeTab === 'mascot' ? styles.tabButtonActive : ''}`}
+          onClick={() => setActiveTab('mascot')}
+        >
+          Mascot
+        </button>
+      </div>
+
+      {activeTab === 'general' && (
+        <>
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Appearance</h3>
         <label className={styles.field}>
@@ -123,8 +167,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           />
           Always On Top
         </label>
-
-
 
         <label className={styles.field}>
           Server Port
@@ -188,52 +230,42 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
 
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Timer Modes</h3>
-        <label className={styles.field}>
-          Generic Default Mode
-          <select
-            className={styles.select}
-            value={settings.defaultGenericMode ?? 'countdown'}
-            onChange={(event) => {
-              const defaultGenericMode = event.target.value as 'countdown' | 'countup'
-              applySettingsUpdate({ defaultGenericMode })
-            }}
-          >
-            <option value="countdown">Countdown</option>
-            <option value="countup">Count Up</option>
-          </select>
-        </label>
+        {timerModeFields.map((modeField) => (
+          <label key={modeField.key} className={styles.field}>
+            {modeField.label}
+            <select
+              className={styles.select}
+              value={modeField.value}
+              onChange={(event) => applySettingsUpdate({
+                [modeField.key]: event.target.value as 'countdown' | 'countup',
+              })}
+            >
+              <option value="countdown">Countdown</option>
+              <option value="countup">Count Up</option>
+            </select>
+          </label>
+        ))}
+      </section>
 
-        <label className={styles.field}>
-          Sit/Stand Default Mode
-          <select
-            className={styles.select}
-            value={settings.defaultSitStandMode ?? 'countdown'}
+      <section className={styles.section}>
+        <h3 className={styles.sectionTitle}>Stage Transitions</h3>
+        <label className={styles.toggleField}>
+          <input
+            type="checkbox"
+            checked={settings.defaultAutoAdvanceStages ?? true}
             onChange={(event) => {
-              const defaultSitStandMode = event.target.value as 'countdown' | 'countup'
-              applySettingsUpdate({ defaultSitStandMode })
+              const defaultAutoAdvanceStages = event.target.checked
+              applySettingsUpdate({ defaultAutoAdvanceStages })
             }}
-          >
-            <option value="countdown">Countdown</option>
-            <option value="countup">Count Up</option>
-          </select>
-        </label>
-
-        <label className={styles.field}>
-          Pomodoro Default Mode
-          <select
-            className={styles.select}
-            value={settings.defaultPomodoroMode ?? 'countdown'}
-            onChange={(event) => {
-              const defaultPomodoroMode = event.target.value as 'countdown' | 'countup'
-              applySettingsUpdate({ defaultPomodoroMode })
-            }}
-          >
-            <option value="countdown">Countdown</option>
-            <option value="countup">Count Up</option>
-          </select>
+          />
+          Automatically continue between stages
         </label>
       </section>
 
+        </>
+      )}
+
+      {activeTab === 'alerts' && (
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Alerts</h3>
         <label className={styles.field}>
@@ -243,7 +275,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             type="range"
             min={0}
             max={100}
-            value={settings.defaultAlertVolume ?? 80}
+            value={settings.defaultAlertVolume ?? DEFAULT_ALERT_VOLUME}
             onChange={(event) => {
               const defaultAlertVolume = Number(event.target.value)
               applySettingsUpdate({ defaultAlertVolume })
@@ -257,12 +289,12 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
             {(settings.defaultAlertCues || []).map((cue) => (
               <div key={cue.id} className={styles.alertCueCard}>
                 <div className={styles.alertCueThresholdRow}>
-                  <span className={styles.alertCueThresholdLabel}>Sound will play when timer is at</span>
+                  <span className={styles.alertCueThresholdLabel}>Sound will play when timer is</span>
                   <input
                     className={styles.numberInput}
                     type="number"
                     min={1}
-                    max={99}
+                    max={100}
                     value={cue.thresholdPercent}
                     onChange={(event) =>
                       updateGlobalAlertCue(cue.id, {
@@ -271,12 +303,18 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                     }
                   />
                   <span className={styles.percentLabel}>%</span>
+                  <span className={styles.alertCueThresholdLabel}>complete</span>
                 </div>
                 <input
                   className={styles.input}
                   type="text"
                   placeholder="Sound file path"
-                  value={cue.soundPath}
+                  readOnly={cue.soundPath === BUILTIN_ALERT_SOUND_SOFT_CHIME}
+                  value={
+                    cue.soundPath === BUILTIN_ALERT_SOUND_SOFT_CHIME
+                      ? builtInSoftChimeLabel
+                      : cue.soundPath
+                  }
                   onChange={(event) =>
                     updateGlobalAlertCue(cue.id, { soundPath: event.target.value })
                   }
@@ -306,6 +344,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         </div>
       </section>
 
+      )}
+
+      {activeTab === 'mascot' && (
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Mascot Defaults</h3>
         <div className={styles.field}>
@@ -435,6 +476,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
           </div>
         </div>
       </section>
+
+      )}
 
       <div className={styles.actions}>
         <button
