@@ -12,6 +12,7 @@ files:
   - package.json
 
 win:
+  icon: assets/icon.png
   target:
     - nsis
 

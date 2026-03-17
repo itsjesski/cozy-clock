@@ -47,6 +47,7 @@ const devServerHeaders = devServerToken
   : undefined
 
 export default defineConfig({
+  base: './',
   plugins: [react()],
   resolve: {
     alias: {
