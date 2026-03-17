@@ -167,7 +167,7 @@ function createWindow() {
 
   const startUrl = isDev
     ? `http://localhost:${getServerPort()}`
-    : `file://${path.join(__dirname, '../renderer/index.html')}`
+    : `file://${path.join(__dirname, '../../../dist/renderer/index.html')}`
 
   mainWindow.loadURL(startUrl)
 
