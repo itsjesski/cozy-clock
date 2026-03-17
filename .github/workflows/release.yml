@@ -26,6 +26,27 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Validate updater artifacts
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'dist/latest.yml')) {
+            throw 'dist/latest.yml not found. electron-updater metadata was not generated.'
+          }
+
+          $latest = Get-Content 'dist/latest.yml' -Raw
+          $pathLine = ($latest -split "`n" | Where-Object { $_ -match '^path:\s+' } | Select-Object -First 1)
+          if (-not $pathLine) {
+            throw "'path' entry missing in dist/latest.yml"
+          }
+
+          $artifactName = ($pathLine -replace '^path:\s+', '').Trim()
+          $artifactPath = Join-Path 'dist' $artifactName
+          if (!(Test-Path $artifactPath)) {
+            throw "latest.yml points to '$artifactName' but that file does not exist in dist/"
+          }
+
+          Write-Host "Updater artifact check passed: $artifactName"
+
       - name: Extract Release Notes from CHANGELOG
         id: changelog
         uses: actions/github-script@v7

@@ -13,6 +13,7 @@ files:
 
 win:
   icon: assets/icon.png
+  artifactName: Cozy.Clock.Setup.${version}.${ext}
   target:
     - nsis
 
