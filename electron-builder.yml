@@ -25,4 +25,4 @@ nsis:
 publish:
   provider: github
   owner: itsjesski
-  repo: CozyClock
+  repo: cozy-clock

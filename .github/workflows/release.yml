@@ -75,3 +75,4 @@ jobs:
           draft: false
           prerelease: false
           body: ${{ steps.changelog.outputs.notes }}
+          token: ${{ secrets.GITHUB_TOKEN }}
