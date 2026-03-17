@@ -146,6 +146,8 @@ function createWindow() {
     ? { width: 480, height: 640, minWidth: 360, minHeight: 520 }
     : { width: 1200, height: 800, minWidth: 800, minHeight: 600 }
 
+  console.error('[DEBUG] Creating window...')
+
   mainWindow = new BrowserWindow({
     width: compactWindowBounds.width,
     height: compactWindowBounds.height,
@@ -169,7 +171,24 @@ function createWindow() {
     ? `http://localhost:${getServerPort()}`
     : `file://${path.join(__dirname, '../../../dist/renderer/index.html')}`
 
-  mainWindow.loadURL(startUrl)
+  logInfo(`Loading URL (isDev=${isDev}): ${startUrl}`)
+
+  // Add error handlers for debugging blank/white screen issues
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    logInfo(`Failed to load ${validatedURL}: ${errorCode} - ${errorDescription}`)
+  })
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    logInfo('Renderer successfully loaded')
+  })
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    logInfo(`Renderer process gone: ${details?.reason}`)
+  })
+
+  mainWindow.loadURL(startUrl).catch((err) => {
+    logInfo(`Error loading URL: ${err.message}`)
+  })
 
   const ensureWindowOnScreen = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
@@ -222,15 +241,19 @@ app.on('ready', async () => {
   registerGlobalProcessErrorHandlers()
 
   logInfo('Application starting')
+  console.error('[DEBUG] App ready event fired')
 
   // Check the configured dev server port before opening the main window.
   if (isDev) {
     const serverPort = getServerPort()
+    console.error(`[DEBUG] isDev=true, port=${serverPort}`)
     if ((await isPortInUse(serverPort)) && !(await isViteDevServerAvailable(serverPort))) {
       logInfo(`Port ${serverPort} is in use, showing port conflict dialog`)
       await showPortConflictDialog(serverPort)
       return
     }
+  } else {
+    console.error('[DEBUG] isDev=false, using packaged renderer path')
   }
 
   createWindow()
