@@ -4,13 +4,15 @@
 
 A customizable sit/stand, pomodoro, and generic timer desktop app with a cute, modular dashboard. Built with Electron, React, Vite, and TypeScript.
 
+<img width="859" height="743" alt="image" src="https://github.com/user-attachments/assets/b10ffab1-b0e4-48dc-9223-a75e5c672213" />
+
+
 ## Features
 
 - ✨ Three timer types: Sit/Stand, Pomodoro, Generic
 - 🎨 Multiple clock display modes: Digital, Analog, Ring, Flip, and compact/minimal-friendly layouts
 - 🎭 10 built-in themes: Cozy, Sakura, Forest, Neon, and Paper in Light and Dark variants
 - 🖼️ User-supplied mascot/character display with global and per-timer overrides
-- 🎬 Streamer Mode for OBS capture (transparent windows)
 - ⏱️ Timer continuity: resume from last time or while app is closed
 - 🔊 Custom alert sounds with global defaults, per-timer overrides, and local file picker support
 - 💫 Optional inspirational messages at countdown milestones
