@@ -74,5 +74,6 @@ jobs:
           artifacts: 'dist/*.exe'
           draft: false
           prerelease: false
+          makeLatest: true
           body: ${{ steps.changelog.outputs.notes }}
           token: ${{ secrets.GITHUB_TOKEN }}

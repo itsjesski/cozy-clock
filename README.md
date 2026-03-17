@@ -1,5 +1,7 @@
 # Cozy Clock
 
+[![Download Latest](https://img.shields.io/badge/Download-Latest%20Release-7c3aed?style=for-the-badge)](https://github.com/itsjesski/cozy-clock/releases/latest)
+
 A customizable sit/stand, pomodoro, and generic timer desktop app with a cute, modular dashboard. Built with Electron, React, Vite, and TypeScript.
 
 ## Features
@@ -18,7 +20,7 @@ A customizable sit/stand, pomodoro, and generic timer desktop app with a cute, m
 
 ## Installation
 
-Download the latest Windows installer from [Releases](https://github.com/itsjesski/CozyClock/releases).
+Download the latest Windows installer from [Releases](https://github.com/itsjesski/cozy-clock/releases).
 
 ## Development
 
@@ -29,8 +31,8 @@ Download the latest Windows installer from [Releases](https://github.com/itsjess
 ### Setup
 
 ```bash
-git clone https://github.com/itsjesski/CozyClock.git
-cd CozyClock
+git clone https://github.com/itsjesski/cozy-clock.git
+cd cozy-clock
 npm install
 ```
 
