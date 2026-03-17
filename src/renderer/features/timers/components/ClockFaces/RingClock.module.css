@@ -5,6 +5,7 @@
   justify-content: center;
   gap: 0.5rem;
   position: relative;
+  z-index: 2;
 }
 
 .ringSvg {
@@ -24,6 +25,7 @@
   fill: var(--text-primary);
   font-family: 'Courier New', monospace;
   font-variant-numeric: tabular-nums;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.28));
 }
 
 .percentage {

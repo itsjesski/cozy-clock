@@ -20,7 +20,6 @@ const DISPLAY_MODE_LABELS: Record<Exclude<ClockDisplayMode, 'minimal'>, string> 
 
 const EMPTY_ALERT_CUES: AlertCue[] = []
 const EMPTY_MASCOT_CUES: MascotAnimationCue[] = []
-const LEGACY_DEFAULT_ACCENT = '#d4a574'
 const MASCOT_ANIMATION_TYPES: MascotAnimationType[] = ['shake', 'wiggle', 'bounce']
 
 const appendWithGeneratedId = <T extends { id: string }>(
@@ -47,14 +46,14 @@ const removeById = <T extends { id: string }>(
 
 const getThemeAccentColor = () => {
   if (typeof window === 'undefined') {
-    return LEGACY_DEFAULT_ACCENT
+    return '#d4a574'
   }
 
   const accent = getComputedStyle(document.documentElement)
     .getPropertyValue('--accent-primary')
     .trim()
 
-  return accent || LEGACY_DEFAULT_ACCENT
+  return accent || '#d4a574'
 }
 
 type MascotPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
@@ -127,11 +126,7 @@ export const useTimerTileSettings = ({
 }: UseTimerTileSettingsParams) => {
   const globalSettings = useGlobalStore((store) => store.settings)
   const themeAccentColor = getThemeAccentColor()
-  const resolvedBorderColor =
-    borderColor?.trim().toLowerCase() === LEGACY_DEFAULT_ACCENT &&
-    themeAccentColor.toLowerCase() !== LEGACY_DEFAULT_ACCENT
-      ? undefined
-      : borderColor
+  const resolvedBorderColor = borderColor
 
   const [currentDisplayMode, setCurrentDisplayMode] = useState<ClockDisplayMode>(
     displayMode === 'minimal' ? 'digital' : displayMode,
@@ -166,7 +161,7 @@ export const useTimerTileSettings = ({
     roundsBeforeLongBreak ?? DEFAULT_POMODORO_ROUNDS,
   )
   const [editableBorderColor, setEditableBorderColor] = useState(
-    resolvedBorderColor || themeAccentColor,
+    borderColor ?? themeAccentColor,
   )
   const [editableUseGlobalAlertVolume, setEditableUseGlobalAlertVolume] = useState(
     alertVolume === undefined,
@@ -182,9 +177,6 @@ export const useTimerTileSettings = ({
   const [editableMascotImagePath, setEditableMascotImagePath] = useState(mascotImagePath || '')
   const [editableMascotSize, setEditableMascotSize] = useState(
     mascotSize ?? (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE),
-  )
-  const [editableMascotScale, setEditableMascotScale] = useState(
-    mascotScale ?? (globalSettings.mascotScale ?? 0.65),
   )
   const [editableMascotPosition, setEditableMascotPosition] = useState(
     mascotPosition ?? (globalSettings.mascotPosition ?? 'top-right'),
@@ -217,7 +209,7 @@ export const useTimerTileSettings = ({
     setEditableLongBreakMinutes(Math.round((longBreakDuration ?? DEFAULT_TIMER_SECONDS.longBreak) / 60))
     setEditablePomodoroRounds(roundsBeforeLongBreak ?? DEFAULT_POMODORO_ROUNDS)
     setCurrentDisplayMode(displayMode === 'minimal' ? 'digital' : displayMode)
-    setEditableBorderColor(resolvedBorderColor || themeAccentColor)
+    setEditableBorderColor(borderColor ?? themeAccentColor)
     setEditableUseGlobalAlertVolume(alertVolume === undefined)
     setEditableAlertVolume(alertVolume ?? (globalSettings.defaultAlertVolume ?? DEFAULT_ALERT_VOLUME))
     setEditableUseGlobalAlertCues(useGlobalAlertCues)
@@ -225,7 +217,6 @@ export const useTimerTileSettings = ({
     setEditableUseGlobalMascotSettings(useGlobalMascotSettings)
     setEditableMascotImagePath(mascotImagePath || '')
     setEditableMascotSize(mascotSize ?? (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE))
-    setEditableMascotScale(mascotScale ?? (globalSettings.mascotScale ?? 0.65))
     setEditableMascotPosition(mascotPosition ?? (globalSettings.mascotPosition ?? 'top-right'))
     setEditableUseGlobalMascotCues(useGlobalMascotAnimationCues)
     setEditableMascotAnimationCues(resolvedMascotAnimationCues)
@@ -242,7 +233,7 @@ export const useTimerTileSettings = ({
     globalSettings.defaultContinueFromLastTime,
     globalSettings.defaultContinueWhileAppClosed,
     globalSettings.mascotPosition,
-    globalSettings.mascotScale,
+    borderColor,
     globalSettings.mascotSize,
     globalSettings.theme,
     longBreakDuration,
@@ -354,10 +345,7 @@ export const useTimerTileSettings = ({
       editableContinueWhileAppClosed === (globalSettings.defaultContinueWhileAppClosed ?? false)
         ? undefined
         : editableContinueWhileAppClosed
-    const borderColorUpdate =
-      editableBorderColor.trim().toLowerCase() === themeAccentColor.toLowerCase()
-        ? undefined
-        : editableBorderColor
+    const borderColorUpdate = editableBorderColor.trim() || undefined
 
     const timingUpdates: Partial<TimerConfig> =
       timerType === 'generic'
@@ -399,12 +387,12 @@ export const useTimerTileSettings = ({
       mascotSize: editableUseGlobalMascotSettings ? undefined : editableMascotSize,
       mascotScale: editableUseGlobalMascotSettings
         ? undefined
-        : Number(editableMascotScale.toFixed(2)),
+        : 1,
       mascotPosition: editableUseGlobalMascotSettings ? undefined : editableMascotPosition,
       useGlobalMascotAnimationCues: editableUseGlobalMascotCues,
       mascotAnimationCues: editableMascotAnimationCues.map((cue) => ({
         ...cue,
-        thresholdPercent: clampPercent(cue.thresholdPercent, 1, 99),
+        thresholdPercent: clampPercent(cue.thresholdPercent, 1, 100),
       })),
     }
 
@@ -504,8 +492,6 @@ export const useTimerTileSettings = ({
     handleMascotUpload,
     editableMascotSize,
     setEditableMascotSize,
-    editableMascotScale,
-    setEditableMascotScale,
     editableMascotPosition,
     setEditableMascotPosition,
     editableUseGlobalMascotCues,

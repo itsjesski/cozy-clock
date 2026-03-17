@@ -278,11 +278,10 @@
 
 @media (max-width: 600px) {
   .alertCueThresholdRow {
-    grid-template-columns: 1fr 64px;
+    grid-template-columns: 1fr 64px auto;
   }
 
-  .alertCueThresholdLabel,
-  .percentLabel {
+  .alertCueThresholdLabel {
     grid-column: 1 / -1;
   }
 }

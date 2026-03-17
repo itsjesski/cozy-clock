@@ -234,9 +234,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   const effectiveMascotSize = useGlobalMascotSettings === false
     ? (mascotSize ?? DEFAULT_MASCOT_SIZE)
     : (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE)
-  const effectiveMascotScale = useGlobalMascotSettings === false
-    ? (mascotScale ?? 0.65)
-    : (globalSettings.mascotScale ?? 0.65)
+  const effectiveMascotScale = 1
   const effectiveMascotPosition = useGlobalMascotSettings === false
     ? (mascotPosition ?? 'top-right')
     : (globalSettings.mascotPosition ?? 'top-right')
@@ -252,7 +250,10 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   return (
     <div
       className={`${styles.tile} ${styles[state.phase]} ${isCompact ? styles.compactTile : ''} ${(isSettingsOpen || isDeleteConfirmOpen) ? styles.modalOpen : ''}`}
-      style={{ ['--tile-border' as string]: resolvedBorderColor || 'var(--accent-primary)' }}
+      style={{
+        ['--tile-border' as string]: resolvedBorderColor || 'var(--accent-primary)',
+        ['--tile-accent' as string]: resolvedBorderColor || 'var(--accent-primary)',
+      }}
     >
       <div className={styles.header}>
         <input

@@ -3,7 +3,7 @@
  */
 
 .tile {
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 7%, var(--bg-secondary));
   border: 1px solid var(--tile-border, var(--border-color));
   border-radius: 12px;
   padding: 1.5rem;
@@ -13,7 +13,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transition: all 0.2s;
   position: relative;
-  min-height: 350px;
 }
 
 .compactTile {
@@ -85,7 +84,7 @@
 .settingsButton {
   background: none;
   border: none;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   cursor: pointer;
   padding: 0.25rem;
   transition: all 0.2s;
@@ -93,6 +92,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
 }
 
 .statsButton {
@@ -106,11 +108,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  line-height: 1;
 }
 
 .statsButton:hover:not(:disabled) {
   background: var(--bg-interactive);
-  transform: scale(1.08);
 }
 
 .statsButton:disabled {
@@ -121,7 +125,7 @@
 .deleteButton {
   background: none;
   border: none;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -131,11 +135,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .deleteButton:hover:not(:disabled) {
   background: color-mix(in srgb, var(--warning) 12%, transparent);
-  transform: scale(1.08);
 }
 
 .deleteButton:disabled {
@@ -145,7 +150,6 @@
 
 .settingsButton:hover:not(:disabled) {
   background: var(--bg-interactive);
-  transform: scale(1.1);
 }
 
 .settingsButton:disabled {
@@ -197,7 +201,7 @@
   flex: 1;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 6%, var(--bg-primary));
   padding: 0.9rem;
   display: flex;
   flex-direction: column;
@@ -250,7 +254,7 @@
 .statsCard {
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 5%, var(--bg-secondary));
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
@@ -310,9 +314,9 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 10%, var(--bg-primary));
   border-radius: 8px;
-  border: 1px solid var(--border-color);
+  border: 1px solid color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 40%, var(--border-color));
   min-height: 130px;
   padding: 1rem;
   animation: slideIn 0.3s ease-out;
@@ -346,7 +350,7 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s;
-  background: var(--accent-primary);
+  background: var(--tile-accent, var(--accent-primary));
   color: white;
   font-weight: 500;
   display: flex;
@@ -355,7 +359,7 @@
 }
 
 .controlButton:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent-primary) 85%, black);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 85%, black);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
@@ -371,15 +375,15 @@
 }
 
 .playPauseBtn {
-  background: var(--accent-primary);
+  background: var(--tile-accent, var(--accent-primary));
 }
 
 .nextBtn {
-  background: color-mix(in srgb, var(--accent-primary) 92%, black);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 92%, black);
 }
 
 .resetBtn {
-  background: color-mix(in srgb, var(--accent-primary) 88%, black);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 88%, black);
 }
 
 .settingsOverlay {
@@ -399,7 +403,7 @@
   height: min(640px, 85vh);
   max-height: 85vh;
   overflow-y: auto;
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 7%, var(--bg-secondary));
   border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 1rem;
@@ -431,6 +435,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 4%, var(--bg-primary));
 }
 
 .settingsSubsection {
@@ -485,7 +490,7 @@
 
 .settingsTabButtonActive {
   border-color: var(--tile-border, var(--accent-primary));
-  background: color-mix(in srgb, var(--accent-primary) 16%, var(--bg-primary));
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 16%, var(--bg-primary));
 }
 
 .settingsField {
@@ -560,7 +565,7 @@
   margin: 0;
   border-radius: 999px;
   padding: 0.35rem 0.6rem;
-  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-primary));
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 10%, var(--bg-primary));
   color: var(--text-secondary);
   font-size: 0.74rem;
   line-height: 1.35;
@@ -718,11 +723,11 @@
 
 .running {
   border-color: var(--tile-border, var(--accent-primary));
-  background: var(--bg-interactive);
+  background: color-mix(in srgb, var(--tile-accent, var(--accent-primary)) 12%, var(--bg-interactive));
 }
 
 .paused {
-  border-color: var(--warning);
+  border-color: var(--tile-border, var(--warning));
 }
 
 /* Responsive */
@@ -750,14 +755,10 @@
   }
 
   .alertCueThresholdRow {
-    grid-template-columns: 1fr 64px;
+    grid-template-columns: 1fr 64px auto;
   }
 
   .alertCueThresholdLabel {
-    grid-column: 1 / -1;
-  }
-
-  .percentLabel {
     grid-column: 1 / -1;
   }
 

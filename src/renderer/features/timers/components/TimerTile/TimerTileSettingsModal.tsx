@@ -69,8 +69,6 @@ export interface TimerTileSettingsModalProps {
   handleMascotUpload: ChangeEventHandler<HTMLInputElement>
   editableMascotSize: number
   setEditableMascotSize: NumberSetter
-  editableMascotScale: number
-  setEditableMascotScale: NumberSetter
   editableMascotPosition: MascotPosition
   setEditableMascotPosition: (value: MascotPosition) => void
   editableUseGlobalMascotCues: boolean
@@ -137,8 +135,6 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
     handleMascotUpload,
     editableMascotSize,
     setEditableMascotSize,
-    editableMascotScale,
-    setEditableMascotScale,
     editableMascotPosition,
     setEditableMascotPosition,
     editableUseGlobalMascotCues,
@@ -150,6 +146,12 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
     mascotAnimationTypes,
   } = props
   const builtInSoftChimeLabel = 'Soft Chime (Built-in)'
+
+  const parseNumberInput = (value: string): number | null => {
+    if (value.trim() === '') return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
 
   const renderNumberField = (
     label: string,
@@ -163,7 +165,11 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
         type="number"
         min={1}
         value={value}
-        onChange={(event) => setValue(Number(event.target.value))}
+        onChange={(event) => {
+          const parsed = parseNumberInput(event.target.value)
+          if (parsed === null) return
+          setValue(parsed)
+        }}
       />
     </label>
   )
@@ -253,7 +259,7 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
                 </select>
               </label>
               <label className={styles.settingsField}>
-                Border Color
+                Color
                 <input
                   className={styles.settingsColorInput}
                   type="color"
@@ -361,19 +367,20 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
                   {editableAlertCues.map((cue) => (
                     <div key={cue.id} className={styles.alertCueCard}>
                       <div className={styles.alertCueThresholdRow}>
-                        <span className={styles.alertCueThresholdLabel}>Sound will play when timer is</span>
+                        <span className={styles.alertCueThresholdLabel}>Play sound at</span>
                         <input
                           className={styles.settingsNumberInput}
                           type="number"
                           min={1}
                           max={100}
                           value={cue.thresholdPercent}
-                          onChange={(event) =>
-                            updateAlertCue(cue.id, { thresholdPercent: Number(event.target.value) })
-                          }
+                          onChange={(event) => {
+                            const parsed = parseNumberInput(event.target.value)
+                            if (parsed === null) return
+                            updateAlertCue(cue.id, { thresholdPercent: parsed })
+                          }}
                         />
-                        <span className={styles.percentLabel}>%</span>
-                        <span className={styles.alertCueThresholdLabel}>complete</span>
+                        <span className={styles.percentLabel}>% complete</span>
                       </div>
                       <input
                         className={styles.settingsInput}
@@ -462,7 +469,6 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
                     </div>
                   </div>
                   {renderRangeField('Mascot Size', 60, 220, editableMascotSize, setEditableMascotSize)}
-                  {renderRangeField('Mascot Scale', 30, 120, Math.round(editableMascotScale * 100), (value) => setEditableMascotScale(value / 100))}
                   <label className={styles.settingsField}>
                     Mascot Position
                     <select
@@ -491,41 +497,48 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
               {!editableUseGlobalMascotCues && (
                 <div className={styles.alertCueList}>
                   {editableMascotAnimationCues.map((cue) => (
-                    <div key={cue.id} className={styles.alertCueRow}>
-                      <input
-                        className={styles.settingsNumberInput}
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={cue.thresholdPercent}
-                        onChange={(event) =>
-                          updateMascotAnimationCue(cue.id, {
-                            thresholdPercent: Number(event.target.value),
-                          })
-                        }
-                      />
-                      <span className={styles.percentLabel}>%</span>
-                      <select
-                        className={styles.settingsSelect}
-                        value={cue.animation}
-                        onChange={(event) =>
-                          updateMascotAnimationCue(cue.id, {
-                            animation: event.target.value as MascotAnimationType,
-                          })
-                        }
-                      >
-                        {mascotAnimationTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        className={styles.removeCueButton}
-                        onClick={() => removeMascotAnimationCue(cue.id)}
-                      >
-                        Remove
-                      </button>
+                    <div key={cue.id} className={styles.alertCueCard}>
+                      <div className={styles.alertCueThresholdRow}>
+                        <span className={styles.alertCueThresholdLabel}>Play animation at</span>
+                        <input
+                          className={styles.settingsNumberInput}
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={cue.thresholdPercent}
+                          onChange={(event) => {
+                            const parsed = parseNumberInput(event.target.value)
+                            if (parsed === null) return
+                            updateMascotAnimationCue(cue.id, {
+                              thresholdPercent: parsed,
+                            })
+                          }}
+                        />
+                        <span className={styles.percentLabel}>% complete</span>
+                      </div>
+                      <div className={styles.alertCueActionsRow}>
+                        <select
+                          className={styles.settingsSelect}
+                          value={cue.animation}
+                          onChange={(event) =>
+                            updateMascotAnimationCue(cue.id, {
+                              animation: event.target.value as MascotAnimationType,
+                            })
+                          }
+                        >
+                          {mascotAnimationTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className={styles.removeCueButton}
+                          onClick={() => removeMascotAnimationCue(cue.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   ))}
                   <button className={styles.addCueButton} onClick={addMascotAnimationCue}>

@@ -28,6 +28,9 @@ const store = new DataStore()
 
 if (isDev) {
   process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
+  const devSessionDataPath = path.join(app.getPath('temp'), 'cozy-clock-dev-session')
+  app.setPath('sessionData', devSessionDataPath)
+  app.commandLine.appendSwitch('disk-cache-dir', path.join(devSessionDataPath, 'Cache'))
 }
 
 applyLowRamSettings()
@@ -225,7 +228,6 @@ function createWindow() {
     mainWindow?.show()
   })
 
-  mainWindow.on('move', ensureWindowOnScreen)
   mainWindow.on('resize', ensureWindowOnScreen)
   screen.on('display-metrics-changed', ensureWindowOnScreen)
 

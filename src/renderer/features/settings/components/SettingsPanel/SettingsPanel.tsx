@@ -31,8 +31,19 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
   const mascotAnimationTypes: MascotAnimationType[] = ['shake', 'wiggle', 'bounce']
   const builtInSoftChimeLabel = 'Soft Chime (Built-in)'
 
+  const parseNumberInput = (value: string): number | null => {
+    if (value.trim() === '') return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  const clampThreshold = (value: number) => Math.max(1, Math.min(100, value))
+
   const updateGlobalAlertCue = (cueId: string, updates: Partial<AlertCue>) => {
-    const next = updateById(settings.defaultAlertCues || [], cueId, updates)
+    const normalized = updates.thresholdPercent === undefined
+      ? updates
+      : { ...updates, thresholdPercent: clampThreshold(updates.thresholdPercent) }
+    const next = updateById(settings.defaultAlertCues || [], cueId, normalized)
     applySettingsUpdate({ defaultAlertCues: next })
   }
 
@@ -61,7 +72,10 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
   }
 
   const updateGlobalMascotCue = (cueId: string, updates: Partial<MascotAnimationCue>) => {
-    const next = updateById(settings.defaultMascotAnimationCues || [], cueId, updates)
+    const normalized = updates.thresholdPercent === undefined
+      ? updates
+      : { ...updates, thresholdPercent: clampThreshold(updates.thresholdPercent) }
+    const next = updateById(settings.defaultMascotAnimationCues || [], cueId, normalized)
     applySettingsUpdate({ defaultMascotAnimationCues: next })
   }
 
@@ -289,21 +303,22 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
             {(settings.defaultAlertCues || []).map((cue) => (
               <div key={cue.id} className={styles.alertCueCard}>
                 <div className={styles.alertCueThresholdRow}>
-                  <span className={styles.alertCueThresholdLabel}>Sound will play when timer is</span>
+                  <span className={styles.alertCueThresholdLabel}>Play sound at</span>
                   <input
                     className={styles.numberInput}
                     type="number"
                     min={1}
                     max={100}
                     value={cue.thresholdPercent}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const parsed = parseNumberInput(event.target.value)
+                      if (parsed === null) return
                       updateGlobalAlertCue(cue.id, {
-                        thresholdPercent: Number(event.target.value),
+                        thresholdPercent: parsed,
                       })
-                    }
+                    }}
                   />
-                  <span className={styles.percentLabel}>%</span>
-                  <span className={styles.alertCueThresholdLabel}>complete</span>
+                  <span className={styles.percentLabel}>% complete</span>
                 </div>
                 <input
                   className={styles.input}
@@ -397,21 +412,6 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
         </label>
 
         <label className={styles.field}>
-          Mascot Scale
-          <input
-            className={styles.range}
-            type="range"
-            min={30}
-            max={120}
-            value={Math.round((settings.mascotScale ?? 0.65) * 100)}
-            onChange={(event) => {
-              const mascotScale = Number(event.target.value) / 100
-              applySettingsUpdate({ mascotScale })
-            }}
-          />
-        </label>
-
-        <label className={styles.field}>
           Mascot Position
           <select
             className={styles.select}
@@ -436,38 +436,45 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
           Global Mascot Animation Cues
           <div className={styles.alertCueList}>
             {(settings.defaultMascotAnimationCues || []).map((cue) => (
-              <div key={cue.id} className={styles.alertCueRow}>
-                <input
-                  className={styles.numberInput}
-                  type="number"
-                  min={1}
-                  max={99}
-                  value={cue.thresholdPercent}
-                  onChange={(event) =>
-                    updateGlobalMascotCue(cue.id, {
-                      thresholdPercent: Number(event.target.value),
-                    })
-                  }
-                />
-                <span className={styles.percentLabel}>%</span>
-                <select
-                  className={styles.select}
-                  value={cue.animation}
-                  onChange={(event) =>
-                    updateGlobalMascotCue(cue.id, {
-                      animation: event.target.value as MascotAnimationType,
-                    })
-                  }
-                >
-                  {mascotAnimationTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-                <button className={styles.smallButton} onClick={() => removeGlobalMascotCue(cue.id)}>
-                  Remove
-                </button>
+              <div key={cue.id} className={styles.alertCueCard}>
+                <div className={styles.alertCueThresholdRow}>
+                  <span className={styles.alertCueThresholdLabel}>Play animation at</span>
+                  <input
+                    className={styles.numberInput}
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={cue.thresholdPercent}
+                    onChange={(event) => {
+                      const parsed = parseNumberInput(event.target.value)
+                      if (parsed === null) return
+                      updateGlobalMascotCue(cue.id, {
+                        thresholdPercent: parsed,
+                      })
+                    }}
+                  />
+                  <span className={styles.percentLabel}>% complete</span>
+                </div>
+                <div className={styles.alertCueActionsRow}>
+                  <select
+                    className={styles.select}
+                    value={cue.animation}
+                    onChange={(event) =>
+                      updateGlobalMascotCue(cue.id, {
+                        animation: event.target.value as MascotAnimationType,
+                      })
+                    }
+                  >
+                    {mascotAnimationTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                  <button className={styles.smallButton} onClick={() => removeGlobalMascotCue(cue.id)}>
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
             <button className={styles.smallButton} onClick={addGlobalMascotCue}>

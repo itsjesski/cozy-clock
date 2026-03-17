@@ -34,7 +34,7 @@ export function createDefaultAppSettings(): AppSettings {
     defaultContinueWhileAppClosed: false,
     defaultAutoAdvanceStages: true,
     mascotSize: 100,
-    mascotScale: 0.65,
+    mascotScale: 1,
     mascotPosition: 'top-right',
     enableInspirationMessages: true,
     autoResetStatsSchedule: 'never',
