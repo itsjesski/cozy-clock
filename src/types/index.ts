@@ -210,6 +210,10 @@ export interface IpcResumeTimer {
   id: string
 }
 
+export interface IpcNextTimerPhase {
+  id: string
+}
+
 export interface IpcResetTimer {
   id: string
 }

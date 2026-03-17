@@ -374,6 +374,10 @@
   background: var(--accent-primary);
 }
 
+.nextBtn {
+  background: color-mix(in srgb, var(--accent-primary) 92%, black);
+}
+
 .resetBtn {
   background: color-mix(in srgb, var(--accent-primary) 88%, black);
 }

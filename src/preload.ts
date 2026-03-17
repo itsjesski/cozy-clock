@@ -25,6 +25,7 @@ const api = {
   startTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_START, { id }),
   pauseTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_PAUSE, { id }),
   resumeTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_RESUME, { id }),
+  nextTimerPhase: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_NEXT_PHASE, { id }),
   resetTimer: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_RESET, { id }),
   getTimerState: (id: string) => ipcRenderer.invoke(ipc.IPC_TIMER_GET_STATE, { id }),
 

@@ -35,6 +35,13 @@ export abstract class BaseTimer {
   abstract handleCompletion(): { isComplete: boolean; nextPhase?: TimerState }
 
   /**
+   * Skip to next phase (when supported by timer type)
+   */
+  skipToNextPhase(): boolean {
+    return false
+  }
+
+  /**
    * Update timer by delta milliseconds
    */
   tick(deltaTime: number): void {

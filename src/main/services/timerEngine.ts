@@ -467,6 +467,41 @@ export function resetTimer(id: string): void {
   stopEngineIfNoRunningTimers()
 }
 
+export function nextTimerPhase(id: string): void {
+  let timer = activeTimers.get(id)
+
+  if (!timer) {
+    const config = store.getTimers().find((t) => t.id === id)
+    if (!config) return
+
+    const savedState = store.getTimerState(id)
+    timer = savedState
+      ? loadTimerFromSavedState(config, savedState)
+      : loadTimer(config, savedState)
+    activeTimers.set(id, timer)
+  }
+
+  syncAccumulatedStats(id, timer)
+
+  const didAdvance = timer.skipToNextPhase()
+  if (!didAdvance) {
+    return
+  }
+
+  lastRecordedElapsedSeconds.set(id, getWholeElapsedSeconds(timer.state.timeElapsed))
+  clearThresholdTracking(id)
+  lastPersistedStateAt.set(id, Date.now())
+  if (timer.state.phase === 'running') {
+    lastRendererEmitAt.set(id, 0)
+    startTimerEngine()
+  } else {
+    lastRendererEmitAt.delete(id)
+    stopEngineIfNoRunningTimers()
+  }
+
+  store.setTimerState(id, timer.getState())
+}
+
 export function deleteTimer(id: string): void {
   activeTimers.delete(id)
   const statsOverview = removeTimerStats(id)

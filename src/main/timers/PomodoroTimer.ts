@@ -68,4 +68,32 @@ export class PomodoroTimer extends BaseTimer {
     this.state.currentPhaseLabel = 'Work'
     return { isComplete: false, nextPhase: this.state }
   }
+
+  reset(): void {
+    super.reset()
+    this.currentPhase = 'work'
+    this.completedRounds = 0
+  }
+
+  skipToNextPhase(): boolean {
+    if (this.currentPhase === 'work') {
+      const isLongBreakTime = (this.completedRounds + 1) % this.roundsBeforeLongBreak === 0
+      this.currentPhase = isLongBreakTime ? 'long-break' : 'short-break'
+      this.completedRounds++
+    } else {
+      this.currentPhase = 'work'
+    }
+
+    this.state.timeElapsed = 0
+    this.state.timeRemaining = this.config.mode === 'countup'
+      ? 0
+      : this.currentPhase === 'work'
+        ? (this.config.workDuration || 25 * 60)
+        : this.currentPhase === 'long-break'
+          ? (this.config.longBreakDuration || 15 * 60)
+          : (this.config.shortBreakDuration || 5 * 60)
+    this.state.currentPhaseLabel = this.getPhaseLabel()
+    this.state.lastUpdatedAt = Date.now()
+    return true
+  }
 }

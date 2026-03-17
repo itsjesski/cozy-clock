@@ -126,6 +126,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     mascotAnimationNonce,
     getCurrentPhaseTotal,
     handlePlayPause,
+    handleNextPhase,
     handleReset,
   } = useTimerTileRuntime({
     id,
@@ -322,7 +323,9 @@ export const TimerTile: React.FC<TimerTileProps> = ({
             <TimerActions
               playPauseLabel={playPauseLabel}
               isLoading={isLoading}
+              showNextButton={timerType === 'pomodoro' || timerType === 'sit-stand'}
               onPlayPause={handlePlayPause}
+              onNextPhase={handleNextPhase}
               onReset={handleResetWithStats}
             />
           </div>

@@ -51,4 +51,29 @@ export class SitStandTimer extends BaseTimer {
     this.state.currentPhaseLabel = 'Sitting'
     return { isComplete: false, nextPhase: this.state }
   }
+
+  reset(): void {
+    super.reset()
+    this.currentPhase = 'sitting'
+    this.completedCycles = 0
+  }
+
+  skipToNextPhase(): boolean {
+    if (this.currentPhase === 'sitting') {
+      this.currentPhase = 'standing'
+    } else {
+      this.currentPhase = 'sitting'
+      this.completedCycles++
+    }
+
+    this.state.timeElapsed = 0
+    this.state.timeRemaining = this.config.mode === 'countup'
+      ? 0
+      : this.currentPhase === 'standing'
+        ? (this.config.standDuration || 5 * 60)
+        : (this.config.sitDuration || 25 * 60)
+    this.state.currentPhaseLabel = this.getPhaseLabel()
+    this.state.lastUpdatedAt = Date.now()
+    return true
+  }
 }

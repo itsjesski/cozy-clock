@@ -177,6 +177,16 @@ export function useTimerTileRuntime({
     })
   }
 
+  const handleNextPhase = async () => {
+    await runTimerAction(async () => {
+      try {
+        await window.electronAPI?.nextTimerPhase(id)
+      } catch (error) {
+        console.error('Error advancing timer phase:', error)
+      }
+    })
+  }
+
   return {
     state,
     setState,
@@ -185,6 +195,7 @@ export function useTimerTileRuntime({
     mascotAnimationNonce,
     getCurrentPhaseTotal,
     handlePlayPause,
+    handleNextPhase,
     handleReset,
   }
 }

@@ -7,6 +7,7 @@ import {
   startTimer,
   pauseTimer,
   resumeTimer,
+  nextTimerPhase,
   resetTimer,
   deleteTimer,
   createAndLoadTimer,
@@ -150,6 +151,26 @@ export function registerTimerHandlers(): void {
       return { success: true }
     } catch (error) {
       console.error('Error resuming timer:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
+  /**
+   * Skip timer to next phase
+   */
+  ipcMain.handle(ipc.IPC_TIMER_NEXT_PHASE, async (_event, { id }: { id: string }) => {
+    try {
+      nextTimerPhase(id)
+      const state = getTimerState(id)
+      const mainWindow = BrowserWindow.getAllWindows()[0]
+      if (mainWindow && state) {
+        mainWindow.webContents.send(ipc.IPC_TIMER_STATE_UPDATE, {
+          states: { [id]: state },
+        })
+      }
+      return { success: true }
+    } catch (error) {
+      console.error('Error skipping to next timer phase:', error)
       return { success: false, error: String(error) }
     }
   })
