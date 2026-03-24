@@ -134,6 +134,8 @@ export const Dashboard: React.FC = () => {
       alertVolume={timer.alertVolume}
       alertCues={timer.alertCues}
       useGlobalAlertCues={timer.useGlobalAlertCues}
+      showTimerNotifications={timer.showTimerNotifications}
+      flashTaskbar={timer.flashTaskbar}
       mascotImagePath={timer.mascotImagePath}
       mascotSize={timer.mascotSize}
       mascotScale={timer.mascotScale}

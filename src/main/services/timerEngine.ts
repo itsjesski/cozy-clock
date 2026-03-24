@@ -3,13 +3,14 @@
  * Manages all active timers and broadcasts state changes to renderer via IPC
  */
 
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, Notification, nativeImage } from 'electron'
 import DataStore from '../store'
 import { createTimer } from '../timers/factory'
 import { getStatsOverview, recordElapsedTime, removeTimerStats } from './statsService'
 import * as ipc from '../../shared/ipc'
 import { DEFAULT_ALERT_VOLUME } from '../../shared/constants'
 import { getPhaseTotalSeconds, getResolvedPhaseLabel } from '../../shared/timerPhase'
+import { resolveWindowIconPath } from '../windows/assetPaths'
 import type { TimerState, TimerConfig, AlertCue, MascotAnimationCue } from '../../types'
 import type { AppSettings } from '../../types'
 import type { BaseTimer } from '../timers/BaseTimer'
@@ -21,16 +22,22 @@ const firedAlertThresholds = new Map<string, Set<number>>()
 const firedMascotThresholds = new Map<string, Set<number>>()
 const lastRemainingPercent = new Map<string, number>()
 const lastPersistedStateAt = new Map<string, number>()
-const lastRendererEmitAt = new Map<string, number>()
+const lastRenderedSecond = new Map<string, number>()
 const lastRecordedElapsedSeconds = new Map<string, number>()
+const pendingElapsedSeconds = new Map<string, number>()
+const lastStatsFlushAt = new Map<string, number>()
+const lastStatsBroadcastAt = new Map<string, number>()
+const attentionIntervals = new Map<number, NodeJS.Timeout>()
 let lastTickTime = Date.now()
+let isPrimaryWindowMoving = false
 let settingsCache: AppSettings | null = null
 let settingsCacheAt = 0
 
 const TICK_INTERVAL = 100 // Update every 100ms for smooth animations
-const STATE_PERSIST_INTERVAL_MS = 1000
-const RENDER_TICK_INTERVAL_MS = 250
+const STATE_PERSIST_INTERVAL_MS = 5000
+const STATS_FLUSH_INTERVAL_MS = 5000
 const SETTINGS_CACHE_TTL_MS = 1000
+const TASKBAR_BLINK_INTERVAL_MS = 700
 
 function getWholeElapsedSeconds(value: number | undefined): number {
   return Math.max(0, Math.floor(value || 0))
@@ -40,6 +47,39 @@ function clearThresholdTracking(id: string): void {
   firedAlertThresholds.delete(id)
   firedMascotThresholds.delete(id)
   lastRemainingPercent.delete(id)
+}
+
+function clearRendererTracking(id: string): void {
+  lastRenderedSecond.delete(id)
+}
+
+function clearStatsTracking(id: string): void {
+  pendingElapsedSeconds.delete(id)
+  lastStatsFlushAt.delete(id)
+  lastStatsBroadcastAt.delete(id)
+}
+
+function flushRunningTimers(now: number): void {
+  activeTimers.forEach((timer, timerId) => {
+    if (timer.state.phase !== 'running') {
+      return
+    }
+
+    syncAccumulatedStats(timerId, timer, now, true)
+    store.setTimerState(timerId, timer.getState())
+    lastPersistedStateAt.set(timerId, now)
+  })
+}
+
+export function setPrimaryWindowMoving(isMoving: boolean): void {
+  if (isPrimaryWindowMoving === isMoving) {
+    return
+  }
+
+  isPrimaryWindowMoving = isMoving
+  if (!isPrimaryWindowMoving) {
+    flushRunningTimers(Date.now())
+  }
 }
 
 function stopEngineIfNoRunningTimers(): void {
@@ -69,6 +109,126 @@ function getResolvedContinuity(config: TimerConfig): {
     continueWhileAppClosed:
       config.continueWhileAppClosed ?? settings.defaultContinueWhileAppClosed ?? false,
   }
+}
+
+function getRenderedRemainingSecond(timer: BaseTimer): number {
+  return Math.max(0, Math.ceil(timer.state.timeRemaining || 0))
+}
+
+function shouldEmitRendererTick(timerId: string, timer: BaseTimer): boolean {
+  const renderedSecond = getRenderedRemainingSecond(timer)
+  const previousSecond = lastRenderedSecond.get(timerId)
+
+  if (previousSecond === renderedSecond) {
+    return false
+  }
+
+  lastRenderedSecond.set(timerId, renderedSecond)
+  return true
+}
+
+function requestWindowAttention(mainWindow: BrowserWindow): void {
+  if (mainWindow.isDestroyed() || mainWindow.isFocused()) {
+    return
+  }
+
+  const existingInterval = attentionIntervals.get(mainWindow.id)
+  if (existingInterval) {
+    return
+  }
+
+  mainWindow.flashFrame(true)
+
+  const interval = setInterval(() => {
+    if (mainWindow.isDestroyed() || mainWindow.isFocused()) {
+      clearWindowAttention(mainWindow)
+      return
+    }
+
+    mainWindow.flashFrame(false)
+    mainWindow.flashFrame(true)
+  }, TASKBAR_BLINK_INTERVAL_MS)
+
+  attentionIntervals.set(mainWindow.id, interval)
+}
+
+export function clearWindowAttention(mainWindow: BrowserWindow): void {
+  const interval = attentionIntervals.get(mainWindow.id)
+  if (interval) {
+    clearInterval(interval)
+    attentionIntervals.delete(mainWindow.id)
+  }
+
+  if (!mainWindow.isDestroyed()) {
+    mainWindow.flashFrame(false)
+  }
+}
+
+function shouldShowTimerNotification(config: TimerConfig): boolean {
+  return config.showTimerNotifications ?? getCachedSettings().defaultShowTimerNotifications ?? true
+}
+
+function shouldFlashTaskbar(config: TimerConfig): boolean {
+  return config.flashTaskbar ?? getCachedSettings().defaultFlashTaskbar ?? true
+}
+
+function showTimerEndNotification(
+  mainWindow: BrowserWindow,
+  timer: BaseTimer,
+  config: TimerConfig,
+  isComplete: boolean,
+): void {
+  if (!Notification.isSupported() || !shouldShowTimerNotification(config)) {
+    return
+  }
+
+  const label = config.label?.trim() || 'Timer'
+  const nextPhaseLabel = timer.getPhaseLabel()
+  const normalizedPhase = nextPhaseLabel.toLowerCase()
+
+  const title = isComplete
+    ? `${label} is complete 🎉`
+    : config.type === 'sit-stand' && normalizedPhase === 'standing'
+      ? '🧍 Stand up and stretch!'
+      : config.type === 'sit-stand' && normalizedPhase === 'sitting'
+        ? '🪑 Take a seat, you\'ve earned it.'
+        : config.type === 'pomodoro' && normalizedPhase.includes('break')
+          ? '☕ Break time!'
+          : config.type === 'pomodoro' && normalizedPhase === 'work'
+            ? '🎯 It\'s time to focus!'
+            : '🔄 Next phase is ready!'
+
+  const body = isComplete
+    ? `Nice work — ${label} is done.`
+    : timer.state.phase === 'running'
+      ? `${nextPhaseLabel} started. You’ve got this.`
+      : `${nextPhaseLabel} is ready when you are.`
+
+  const iconPath = resolveWindowIconPath()
+  const notification = new Notification({
+    title,
+    body,
+    silent: true,
+    ...(iconPath ? { icon: nativeImage.createFromPath(iconPath) } : {}),
+  })
+
+  notification.on('click', () => {
+    if (mainWindow.isDestroyed()) {
+      return
+    }
+
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore()
+    }
+
+    if (!mainWindow.isVisible()) {
+      mainWindow.show()
+    }
+
+    mainWindow.focus()
+  })
+
+  notification.show()
 }
 
 function isCurrentPhaseComplete(timer: BaseTimer): boolean {
@@ -170,7 +330,10 @@ export function stopTimerEngine(): void {
 }
 
 function updateRunningTimers(): void {
-  if (activeTimers.size === 0) return
+  if (activeTimers.size === 0) {
+    lastTickTime = Date.now()
+    return
+  }
 
   const now = Date.now()
   const deltaTime = now - lastTickTime
@@ -186,20 +349,17 @@ function updateRunningTimers(): void {
     // Tick the timer
     timer.tick(deltaTime)
 
-    syncAccumulatedStats(timerId, timer)
+    syncAccumulatedStats(timerId, timer, now)
 
     emitThresholdAlerts(timerId, timer, mainWindow)
 
     const lastPersisted = lastPersistedStateAt.get(timerId) ?? 0
-    if (now - lastPersisted >= STATE_PERSIST_INTERVAL_MS) {
+    if (!isPrimaryWindowMoving && now - lastPersisted >= STATE_PERSIST_INTERVAL_MS) {
       store.setTimerState(timerId, timer.getState())
       lastPersistedStateAt.set(timerId, now)
     }
 
-    const lastRendered = lastRendererEmitAt.get(timerId) ?? 0
-    const shouldEmitRendererTick = now - lastRendered >= RENDER_TICK_INTERVAL_MS
-
-    if (isWindowVisible && shouldEmitRendererTick) {
+    if (isWindowVisible && shouldEmitRendererTick(timerId, timer)) {
       mainWindow.webContents.send(ipc.IPC_TIMER_TICK, {
         id: timerId,
         timeElapsed: timer.state.timeElapsed,
@@ -207,7 +367,6 @@ function updateRunningTimers(): void {
         phase: 'running',
         currentPhaseLabel: timer.getPhaseLabel(),
       })
-      lastRendererEmitAt.set(timerId, now)
     }
 
     // Check if timer is complete
@@ -221,17 +380,34 @@ function getCurrentPhaseTotalSeconds(timer: BaseTimer): number {
   return getPhaseTotalSeconds(timer.config, timer.getPhaseLabel())
 }
 
-function syncAccumulatedStats(timerId: string, timer: BaseTimer): void {
+function syncAccumulatedStats(timerId: string, timer: BaseTimer, now: number, forceFlush = false): void {
   const currentWholeElapsed = Math.max(0, Math.floor(timer.state.timeElapsed || 0))
   const lastRecorded = lastRecordedElapsedSeconds.get(timerId) ?? 0
   const delta = currentWholeElapsed - lastRecorded
 
-  if (delta <= 0) {
+  if (delta > 0) {
+    pendingElapsedSeconds.set(timerId, (pendingElapsedSeconds.get(timerId) ?? 0) + delta)
+    lastRecordedElapsedSeconds.set(timerId, currentWholeElapsed)
+  }
+
+  const pending = pendingElapsedSeconds.get(timerId) ?? 0
+  if (pending <= 0) {
     return
   }
 
-  const statsOverview = recordElapsedTime(timer.config, delta, timer.getPhaseLabel())
-  lastRecordedElapsedSeconds.set(timerId, lastRecorded + delta)
+  if (isPrimaryWindowMoving && !forceFlush) {
+    return
+  }
+
+  const lastFlushed = lastStatsFlushAt.get(timerId) ?? 0
+  if (!forceFlush && now - lastFlushed < STATS_FLUSH_INTERVAL_MS) {
+    return
+  }
+
+  const statsOverview = recordElapsedTime(timer.config, pending, timer.getPhaseLabel())
+  pendingElapsedSeconds.delete(timerId)
+  lastStatsFlushAt.set(timerId, now)
+  lastStatsBroadcastAt.set(timerId, now)
 
   BrowserWindow.getAllWindows().forEach((window) => {
     window.webContents.send(ipc.IPC_STATS_UPDATE, statsOverview)
@@ -319,13 +495,18 @@ function handleTimerComplete(
 ): void {
   const completion = timer.handleCompletion()
   lastRecordedElapsedSeconds.set(timerId, getWholeElapsedSeconds(timer.state.timeElapsed))
+  const config = store.getTimers().find((t) => t.id === timerId) ?? timer.config
+
+  if (shouldFlashTaskbar(config)) {
+    requestWindowAttention(mainWindow)
+  }
+  showTimerEndNotification(mainWindow, timer, config, completion.isComplete)
 
   if (completion.isComplete) {
     // Timer is fully done
     pauseTimer(timerId)
 
     // Play alert sound if configured
-    const config = store.getTimers().find((t) => t.id === timerId)
     if (config?.alertSounds?.['timer-end']) {
       mainWindow.webContents.send(ipc.IPC_TIMER_ALERT, {
         id: timerId,
@@ -337,7 +518,6 @@ function handleTimerComplete(
   } else {
     // Timer transitioned to next phase
     // Send phase change alert
-    const config = store.getTimers().find((t) => t.id === timerId)
     const eventKey = config?.type === 'sit-stand'
       ? timer.state.currentPhaseLabel === 'Standing'
         ? 'stand-start'
@@ -402,9 +582,11 @@ export function startTimer(id: string): void {
 
   timer.start()
   lastRecordedElapsedSeconds.set(id, getWholeElapsedSeconds(timer.state.timeElapsed))
+  clearStatsTracking(id)
+  lastStatsFlushAt.set(id, Date.now())
   clearThresholdTracking(id)
   lastPersistedStateAt.set(id, Date.now())
-  lastRendererEmitAt.set(id, 0)
+  clearRendererTracking(id)
   store.setTimerState(id, timer.getState())
   startTimerEngine()
 }
@@ -413,11 +595,11 @@ export function pauseTimer(id: string): void {
   const timer = activeTimers.get(id)
 
   if (timer) {
-    syncAccumulatedStats(id, timer)
+    syncAccumulatedStats(id, timer, Date.now(), true)
     timer.pause()
     store.setTimerState(id, timer.getState())
     lastPersistedStateAt.set(id, Date.now())
-    lastRendererEmitAt.delete(id)
+    clearRendererTracking(id)
   }
 
   stopEngineIfNoRunningTimers()
@@ -439,8 +621,10 @@ export function resumeTimer(id: string): void {
 
   timer.resume()
   lastRecordedElapsedSeconds.set(id, getWholeElapsedSeconds(timer.state.timeElapsed))
+  clearStatsTracking(id)
+  lastStatsFlushAt.set(id, Date.now())
   lastPersistedStateAt.set(id, Date.now())
-  lastRendererEmitAt.set(id, 0)
+  clearRendererTracking(id)
   store.setTimerState(id, timer.getState())
   startTimerEngine()
 }
@@ -449,13 +633,14 @@ export function resetTimer(id: string): void {
   const timer = activeTimers.get(id)
 
   if (timer) {
-    syncAccumulatedStats(id, timer)
+    syncAccumulatedStats(id, timer, Date.now(), true)
 
     timer.reset()
     lastRecordedElapsedSeconds.set(id, 0)
+    clearStatsTracking(id)
     clearThresholdTracking(id)
     lastPersistedStateAt.set(id, Date.now())
-    lastRendererEmitAt.delete(id)
+    clearRendererTracking(id)
     store.setTimerState(id, timer.getState())
 
     const statsOverview = getStatsOverview()
@@ -481,7 +666,7 @@ export function nextTimerPhase(id: string): void {
     activeTimers.set(id, timer)
   }
 
-  syncAccumulatedStats(id, timer)
+  syncAccumulatedStats(id, timer, Date.now(), true)
 
   const didAdvance = timer.skipToNextPhase()
   if (!didAdvance) {
@@ -492,10 +677,10 @@ export function nextTimerPhase(id: string): void {
   clearThresholdTracking(id)
   lastPersistedStateAt.set(id, Date.now())
   if (timer.state.phase === 'running') {
-    lastRendererEmitAt.set(id, 0)
+    clearRendererTracking(id)
     startTimerEngine()
   } else {
-    lastRendererEmitAt.delete(id)
+    clearRendererTracking(id)
     stopEngineIfNoRunningTimers()
   }
 
@@ -503,6 +688,11 @@ export function nextTimerPhase(id: string): void {
 }
 
 export function deleteTimer(id: string): void {
+  const activeTimer = activeTimers.get(id)
+  if (activeTimer) {
+    syncAccumulatedStats(id, activeTimer, Date.now(), true)
+  }
+
   activeTimers.delete(id)
   const statsOverview = removeTimerStats(id)
   BrowserWindow.getAllWindows().forEach((window) => {
@@ -510,7 +700,8 @@ export function deleteTimer(id: string): void {
   })
   clearThresholdTracking(id)
   lastPersistedStateAt.delete(id)
-  lastRendererEmitAt.delete(id)
+  clearRendererTracking(id)
+  clearStatsTracking(id)
   lastRecordedElapsedSeconds.delete(id)
   store.deleteTimer(id)
   store.deleteTimerState(id)
@@ -579,8 +770,10 @@ export function initializeTimersFromStore(): void {
 
       activeTimers.set(config.id, timer)
       lastRecordedElapsedSeconds.set(config.id, getWholeElapsedSeconds(timer.state.timeElapsed))
+      clearStatsTracking(config.id)
+      lastStatsFlushAt.set(config.id, Date.now())
       lastPersistedStateAt.set(config.id, Date.now())
-      lastRendererEmitAt.set(config.id, 0)
+      clearRendererTracking(config.id)
     }
   })
 }

@@ -62,6 +62,14 @@ export interface TimerTileSettingsModalProps {
   browseAlertCueSound: (cueId: string) => void
   removeAlertCue: (cueId: string) => void
   addAlertCue: () => void
+  editableUseGlobalTimerNotifications: boolean
+  setEditableUseGlobalTimerNotifications: BoolSetter
+  editableShowTimerNotifications: boolean
+  setEditableShowTimerNotifications: BoolSetter
+  editableUseGlobalFlashTaskbar: boolean
+  setEditableUseGlobalFlashTaskbar: BoolSetter
+  editableFlashTaskbar: boolean
+  setEditableFlashTaskbar: BoolSetter
   editableUseGlobalMascotSettings: boolean
   setEditableUseGlobalMascotSettings: BoolSetter
   editableMascotImagePath: string
@@ -128,6 +136,14 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
     browseAlertCueSound,
     removeAlertCue,
     addAlertCue,
+    editableUseGlobalTimerNotifications,
+    setEditableUseGlobalTimerNotifications,
+    editableShowTimerNotifications,
+    setEditableShowTimerNotifications,
+    editableUseGlobalFlashTaskbar,
+    setEditableUseGlobalFlashTaskbar,
+    editableFlashTaskbar,
+    setEditableFlashTaskbar,
     editableUseGlobalMascotSettings,
     setEditableUseGlobalMascotSettings,
     editableMascotImagePath,
@@ -343,6 +359,38 @@ export function TimerTileSettingsModal(props: TimerTileSettingsModalProps) {
           <>
             <section className={styles.settingsSection}>
               <h5 className={styles.settingsSectionTitle}>Alerts</h5>
+              <label className={styles.settingsToggle}>
+                <input
+                  type="checkbox"
+                  checked={editableUseGlobalTimerNotifications}
+                  onChange={(event) => setEditableUseGlobalTimerNotifications(event.target.checked)}
+                />
+                Use global desktop notifications
+              </label>
+              {!editableUseGlobalTimerNotifications && (
+                renderInfoToggle(
+                  'Desktop notifications',
+                  'Show a system notification when this timer or stage finishes.',
+                  editableShowTimerNotifications,
+                  setEditableShowTimerNotifications,
+                )
+              )}
+              <label className={styles.settingsToggle}>
+                <input
+                  type="checkbox"
+                  checked={editableUseGlobalFlashTaskbar}
+                  onChange={(event) => setEditableUseGlobalFlashTaskbar(event.target.checked)}
+                />
+                Use global taskbar flash
+              </label>
+              {!editableUseGlobalFlashTaskbar && (
+                renderInfoToggle(
+                  'Taskbar flash',
+                  'Flash the Windows taskbar button when this timer or stage finishes.',
+                  editableFlashTaskbar,
+                  setEditableFlashTaskbar,
+                )
+              )}
               <label className={styles.settingsToggle}>
                 <input
                   type="checkbox"

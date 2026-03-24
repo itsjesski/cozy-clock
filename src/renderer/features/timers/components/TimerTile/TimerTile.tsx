@@ -49,6 +49,8 @@ interface TimerTileProps {
   alertVolume?: number
   alertCues?: AlertCue[]
   useGlobalAlertCues?: boolean
+  showTimerNotifications?: boolean
+  flashTaskbar?: boolean
   mascotImagePath?: string
   mascotSize?: number
   mascotScale?: number
@@ -99,6 +101,8 @@ export const TimerTile: React.FC<TimerTileProps> = ({
   alertVolume,
   alertCues,
   useGlobalAlertCues = true,
+  showTimerNotifications,
+  flashTaskbar,
   mascotImagePath,
   mascotSize,
   mascotScale,
@@ -126,6 +130,7 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     mascotAnimationNonce,
     getCurrentPhaseTotal,
     handlePlayPause,
+    handleRestart,
     handleNextPhase,
     handleReset,
   } = useTimerTileRuntime({
@@ -174,6 +179,8 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     alertVolume,
     alertCues,
     useGlobalAlertCues,
+    showTimerNotifications,
+    flashTaskbar,
     mascotImagePath,
     mascotSize,
     mascotScale,
@@ -228,7 +235,15 @@ export const TimerTile: React.FC<TimerTileProps> = ({
     })
   }
 
-  const playPauseLabel = getPlayPauseLabel(state.phase)
+  const isGenericCountdownRestartState =
+    timerType === 'generic' &&
+    timerMode === 'countdown' &&
+    state.phase === 'paused' &&
+    state.timeRemaining <= 0
+
+  const playPauseLabel = getPlayPauseLabel(state.phase, {
+    restart: isGenericCountdownRestartState,
+  })
   const effectiveMascotImagePath =
     useGlobalMascotSettings === false ? mascotImagePath : globalSettings.mascotImagePath
   const effectiveMascotSize = useGlobalMascotSettings === false
@@ -325,7 +340,11 @@ export const TimerTile: React.FC<TimerTileProps> = ({
               playPauseLabel={playPauseLabel}
               isLoading={isLoading}
               showNextButton={timerType === 'pomodoro' || timerType === 'sit-stand'}
-              onPlayPause={handlePlayPause}
+              onPlayPause={
+                isGenericCountdownRestartState
+                  ? handleRestart
+                  : handlePlayPause
+              }
               onNextPhase={handleNextPhase}
               onReset={handleResetWithStats}
             />

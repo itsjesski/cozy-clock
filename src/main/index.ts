@@ -9,7 +9,12 @@ import http from 'http'
 import isDev from 'electron-is-dev'
 import { initializeUpdater } from './services/updater'
 import { registerAllHandlers } from './ipcHandlers'
-import { startTimerEngine, initializeTimersFromStore } from './services/timerEngine'
+import {
+  startTimerEngine,
+  initializeTimersFromStore,
+  clearWindowAttention,
+  setPrimaryWindowMoving,
+} from './services/timerEngine'
 import * as ipc from '../shared/ipc'
 import DataStore from './store'
 import { logInfo } from './services/logger'
@@ -34,6 +39,10 @@ if (isDev) {
 }
 
 applyLowRamSettings()
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.cozyclock.app')
+}
 
 export function getServerPort(): number {
   const settingsPort = Number(store.getSettings().serverPort)
@@ -193,6 +202,27 @@ function createWindow() {
     logInfo(`Error loading URL: ${err.message}`)
   })
 
+  let moveIdleTimeout: NodeJS.Timeout | null = null
+
+  const markWindowMoving = () => {
+    setPrimaryWindowMoving(true)
+
+    if (moveIdleTimeout) {
+      clearTimeout(moveIdleTimeout)
+    }
+
+    moveIdleTimeout = setTimeout(() => {
+      setPrimaryWindowMoving(false)
+      moveIdleTimeout = null
+    }, 180)
+  }
+
+  const clearAttentionRequest = () => {
+    if (mainWindow) {
+      clearWindowAttention(mainWindow)
+    }
+  }
+
   const ensureWindowOnScreen = () => {
     if (!mainWindow || mainWindow.isDestroyed()) return
 
@@ -225,13 +255,23 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     ensureWindowOnScreen()
+    clearAttentionRequest()
     mainWindow?.show()
   })
 
   mainWindow.on('resize', ensureWindowOnScreen)
+  mainWindow.on('move', markWindowMoving)
+  mainWindow.on('focus', clearAttentionRequest)
+  mainWindow.on('show', clearAttentionRequest)
+  mainWindow.on('restore', clearAttentionRequest)
   screen.on('display-metrics-changed', ensureWindowOnScreen)
 
   mainWindow.on('closed', () => {
+    setPrimaryWindowMoving(false)
+    if (moveIdleTimeout) {
+      clearTimeout(moveIdleTimeout)
+      moveIdleTimeout = null
+    }
     screen.removeListener('display-metrics-changed', ensureWindowOnScreen)
     mainWindow = null
   })

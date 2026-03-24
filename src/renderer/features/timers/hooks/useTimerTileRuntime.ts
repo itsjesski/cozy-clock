@@ -158,6 +158,25 @@ export function useTimerTileRuntime({
     })
   }
 
+  const handleRestart = async () => {
+    await runTimerAction(async () => {
+      try {
+        await window.electronAPI?.resetTimer(id)
+        await window.electronAPI?.startTimer(id)
+        setState((prev) => ({
+          ...prev,
+          phase: 'running',
+          timeElapsed: 0,
+          timeRemaining: getCurrentPhaseTotal(prev.currentPhaseLabel),
+          currentPhaseLabel: getResolvedPhaseLabel(timerType, timerMode, prev.currentPhaseLabel),
+          lastUpdatedAt: Date.now(),
+        }))
+      } catch (error) {
+        console.error('Error restarting timer:', error)
+      }
+    })
+  }
+
   const handleReset = async (afterReset?: () => Promise<void> | void) => {
     await runTimerAction(async () => {
       try {
@@ -195,6 +214,7 @@ export function useTimerTileRuntime({
     mascotAnimationNonce,
     getCurrentPhaseTotal,
     handlePlayPause,
+    handleRestart,
     handleNextPhase,
     handleReset,
   }

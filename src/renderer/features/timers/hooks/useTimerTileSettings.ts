@@ -79,6 +79,8 @@ interface UseTimerTileSettingsParams {
   alertVolume?: number
   alertCues?: AlertCue[]
   useGlobalAlertCues: boolean
+  showTimerNotifications?: boolean
+  flashTaskbar?: boolean
   mascotImagePath?: string
   mascotSize?: number
   mascotScale?: number
@@ -112,6 +114,8 @@ export const useTimerTileSettings = ({
   alertVolume,
   alertCues,
   useGlobalAlertCues,
+  showTimerNotifications,
+  flashTaskbar,
   mascotImagePath,
   mascotSize,
   mascotScale,
@@ -172,6 +176,18 @@ export const useTimerTileSettings = ({
   const [editableUseGlobalAlertCues, setEditableUseGlobalAlertCues] = useState(useGlobalAlertCues)
   const resolvedAlertCues = alertCues ?? EMPTY_ALERT_CUES
   const [editableAlertCues, setEditableAlertCues] = useState<AlertCue[]>(resolvedAlertCues)
+  const [editableUseGlobalTimerNotifications, setEditableUseGlobalTimerNotifications] = useState(
+    showTimerNotifications === undefined,
+  )
+  const [editableShowTimerNotifications, setEditableShowTimerNotifications] = useState(
+    showTimerNotifications ?? (globalSettings.defaultShowTimerNotifications ?? true),
+  )
+  const [editableUseGlobalFlashTaskbar, setEditableUseGlobalFlashTaskbar] = useState(
+    flashTaskbar === undefined,
+  )
+  const [editableFlashTaskbar, setEditableFlashTaskbar] = useState(
+    flashTaskbar ?? (globalSettings.defaultFlashTaskbar ?? true),
+  )
   const [editableUseGlobalMascotSettings, setEditableUseGlobalMascotSettings] =
     useState(useGlobalMascotSettings)
   const [editableMascotImagePath, setEditableMascotImagePath] = useState(mascotImagePath || '')
@@ -214,6 +230,12 @@ export const useTimerTileSettings = ({
     setEditableAlertVolume(alertVolume ?? (globalSettings.defaultAlertVolume ?? DEFAULT_ALERT_VOLUME))
     setEditableUseGlobalAlertCues(useGlobalAlertCues)
     setEditableAlertCues(resolvedAlertCues)
+    setEditableUseGlobalTimerNotifications(showTimerNotifications === undefined)
+    setEditableShowTimerNotifications(
+      showTimerNotifications ?? (globalSettings.defaultShowTimerNotifications ?? true),
+    )
+    setEditableUseGlobalFlashTaskbar(flashTaskbar === undefined)
+    setEditableFlashTaskbar(flashTaskbar ?? (globalSettings.defaultFlashTaskbar ?? true))
     setEditableUseGlobalMascotSettings(useGlobalMascotSettings)
     setEditableMascotImagePath(mascotImagePath || '')
     setEditableMascotSize(mascotSize ?? (globalSettings.mascotSize ?? DEFAULT_MASCOT_SIZE))
@@ -228,7 +250,10 @@ export const useTimerTileSettings = ({
     continueWhileAppClosed,
     displayMode,
     duration,
+    flashTaskbar,
     globalSettings.defaultAlertVolume,
+    globalSettings.defaultFlashTaskbar,
+    globalSettings.defaultShowTimerNotifications,
     globalSettings.defaultAutoAdvanceStages,
     globalSettings.defaultContinueFromLastTime,
     globalSettings.defaultContinueWhileAppClosed,
@@ -248,6 +273,7 @@ export const useTimerTileSettings = ({
     roundsBeforeLongBreak,
     shortBreakDuration,
     sitDuration,
+    showTimerNotifications,
     standDuration,
     themeAccentColor,
     timerMode,
@@ -382,6 +408,9 @@ export const useTimerTileSettings = ({
       alertVolume: editableUseGlobalAlertVolume ? undefined : clampPercent(editableAlertVolume),
       useGlobalAlertCues: editableUseGlobalAlertCues,
       alertCues: cleanedAlertCues,
+      showTimerNotifications:
+        editableUseGlobalTimerNotifications ? undefined : editableShowTimerNotifications,
+      flashTaskbar: editableUseGlobalFlashTaskbar ? undefined : editableFlashTaskbar,
       useGlobalMascotSettings: editableUseGlobalMascotSettings,
       mascotImagePath: editableUseGlobalMascotSettings ? undefined : editableMascotImagePath,
       mascotSize: editableUseGlobalMascotSettings ? undefined : editableMascotSize,
@@ -485,6 +514,14 @@ export const useTimerTileSettings = ({
     browseAlertCueSound,
     removeAlertCue,
     addAlertCue,
+    editableUseGlobalTimerNotifications,
+    setEditableUseGlobalTimerNotifications,
+    editableShowTimerNotifications,
+    setEditableShowTimerNotifications,
+    editableUseGlobalFlashTaskbar,
+    setEditableUseGlobalFlashTaskbar,
+    editableFlashTaskbar,
+    setEditableFlashTaskbar,
     editableUseGlobalMascotSettings,
     setEditableUseGlobalMascotSettings,
     editableMascotImagePath,

@@ -26,6 +26,8 @@ export function createDefaultAppSettings(): AppSettings {
     theme: DEFAULT_THEME,
     defaultAlertCues: DEFAULT_ALERT_CUES.map((cue) => ({ ...cue })),
     defaultAlertVolume: DEFAULT_ALERT_VOLUME,
+    defaultShowTimerNotifications: true,
+    defaultFlashTaskbar: true,
     defaultMascotAnimationCues: DEFAULT_MASCOT_CUES.map((cue) => ({ ...cue })),
     alwaysOnTop: false,
     compactMode: false,

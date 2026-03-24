@@ -1,7 +1,7 @@
 import styles from './TimerTile.module.css'
 
 interface TimerActionsProps {
-  playPauseLabel: 'Start' | 'Pause' | 'Resume'
+  playPauseLabel: 'Start' | 'Pause' | 'Resume' | 'Restart'
   isLoading: boolean
   showNextButton?: boolean
   onPlayPause: () => void

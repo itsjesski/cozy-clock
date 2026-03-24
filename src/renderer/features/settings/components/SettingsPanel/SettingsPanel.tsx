@@ -283,6 +283,38 @@ export const SettingsPanel = ({ onClose }: SettingsPanelProps) => {
       {activeTab === 'alerts' && (
       <section className={styles.section}>
         <h3 className={styles.sectionTitle}>Alerts</h3>
+        <div className={styles.subsection}>
+          <label className={styles.optionRow}>
+            <input
+              type="checkbox"
+              checked={settings.defaultShowTimerNotifications ?? true}
+              onChange={(event) => {
+                const defaultShowTimerNotifications = event.target.checked
+                applySettingsUpdate({ defaultShowTimerNotifications })
+              }}
+            />
+            <span className={styles.optionText}>
+              <span className={styles.optionTitle}>Desktop notifications</span>
+              <span className={styles.optionDescription}>Show a system notification when a timer or stage finishes.</span>
+            </span>
+          </label>
+
+          <label className={styles.optionRow}>
+            <input
+              type="checkbox"
+              checked={settings.defaultFlashTaskbar ?? true}
+              onChange={(event) => {
+                const defaultFlashTaskbar = event.target.checked
+                applySettingsUpdate({ defaultFlashTaskbar })
+              }}
+            />
+            <span className={styles.optionText}>
+              <span className={styles.optionTitle}>Flash taskbar button</span>
+              <span className={styles.optionDescription}>Request attention in the Windows taskbar when a timer or stage finishes.</span>
+            </span>
+          </label>
+        </div>
+
         <label className={styles.field}>
           Global Alert Volume
           <input

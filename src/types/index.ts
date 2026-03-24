@@ -56,6 +56,8 @@ export interface TimerConfig {
   alertCues?: AlertCue[]
   useGlobalAlertCues?: boolean
   alertVolume?: number // 0-100
+  showTimerNotifications?: boolean
+  flashTaskbar?: boolean
   // Mascot animations
   mascotAnimationCues?: MascotAnimationCue[]
   useGlobalMascotAnimationCues?: boolean
@@ -133,6 +135,8 @@ export interface AppSettings {
   accentColor?: string
   defaultAlertCues?: AlertCue[]
   defaultAlertVolume?: number
+  defaultShowTimerNotifications?: boolean
+  defaultFlashTaskbar?: boolean
   defaultMascotAnimationCues?: MascotAnimationCue[]
   alwaysOnTop?: boolean
   compactMode?: boolean
